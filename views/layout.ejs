@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaign Builder</title>
+    <% 
+    // Skip base tag for localhost to prevent redirects and CSP violations
+    const isLocalhost = (typeof locals !== 'undefined' && locals.isLocalhost) ||
+                        (typeof baseUrl !== 'undefined' && baseUrl && (baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1'))) ||
+                        (typeof locals !== 'undefined' && locals.baseUrl && (locals.baseUrl.includes('localhost') || locals.baseUrl.includes('127.0.0.1'))) ||
+                        (typeof locals !== 'undefined' && locals.IS_STAGING === true);
+    if (!isLocalhost) {
+      const baseUrlValue = typeof baseUrl !== 'undefined' ? baseUrl : (typeof locals !== 'undefined' && locals.baseUrl ? locals.baseUrl : 'https://campaignbuilder.ca');
+    %>
+    <base href="<%= baseUrlValue %>">
+    <% } else { %>
+    <!-- Base tag skipped for localhost to prevent CSP violations and redirects -->
+    <% } %>
+    <link rel="stylesheet" href="/css/tailwind.min.css">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <%- typeof(style) != 'undefined' ? style : '' %>
+    
+    <!-- Keyboard Navigation & Accessibility Styles -->
+    <style>
+        /* Keyboard Focus Indicators */
+        .keyboard-focused,
+        *:focus {
+            outline: 3px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        /* Table keyboard navigation */
+        .keyboard-focus {
+            background-color: #dbeafe !important;
+            outline: 2px solid #3b82f6 !important;
+        }
+        
+        /* Skip to content link */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: #000;
+            color: #fff;
+            padding: 8px;
+            text-decoration: none;
+            z-index: 1000;
+            border-radius: 0 0 4px 4px;
+        }
+        
+        .skip-link:focus {
+            top: 0;
+        }
+        
+        /* Accessible button states */
+        button:focus,
+        .btn:focus {
+            outline: 3px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+        
+        /* Modal accessibility */
+        .modal[aria-hidden="true"] {
+            display: none;
+        }
+        
+        .modal[aria-hidden="false"] {
+            display: block;
+        }
+        
+        /* Screen reader only text */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+        
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            .keyboard-focused,
+            *:focus {
+                outline: 4px solid #000 !important;
+                background-color: #fff !important;
+                color: #000 !important;
+            }
+        }
+        
+        /* Reduced motion support */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        
+        /* Focus indicators for buttons and links */
+        a:focus,
+        button:focus,
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: 3px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3) !important;
+        }
+        
+        /* Tailwind button focus overrides */
+        .bg-blue-600:focus,
+        .bg-green-600:focus,
+        .bg-red-600:focus,
+        .bg-indigo-600:focus,
+        .bg-purple-600:focus {
+            outline: 3px solid #3b82f6 !important;
+            outline-offset: 2px !important;
+        }
+
+        /* Requests page: delete-old-90 button - force visible fill and text (survives purged Tailwind / overrides) */
+        button.requests-delete-old-90 {
+            -webkit-appearance: none !important;
+            appearance: none !important;
+            background-color: #dc2626 !important;
+            color: #fff !important;
+        }
+        button.requests-delete-old-90:hover {
+            background-color: #b91c1c !important;
+            color: #fff !important;
+        }
+    </style>
+
+    <style>
+    /* COMPREHENSIVE IMAGE SIZING - Target ALL header image displays */
+    
+    /* Template editor thumbnail - header images only */
+    .header-thumbnail-container img[src*="header"] {
+        max-width: 240px !important;
+        max-height: 128px !important;
+        width: 240px !important;
+        height: 128px !important;
+        object-fit: cover !important;
+        object-position: center !important;
+    }
+    
+    /* Template preview cards - header images only */
+    .border.rounded-lg.overflow-hidden img[src*="header"] {
+        max-width: 100% !important;
+        max-height: 150px !important;
+        width: 100% !important;
+        height: 150px !important;
+        object-fit: cover !important;
+        object-position: center !important;
+    }
+    
+    /* Template preview header section */
+    .template-preview-header {
+        aspect-ratio: 3/1 !important;
+        max-height: 200px !important;
+        overflow: hidden !important;
+    }
+    
+    .template-preview-header img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+        object-position: center !important;
+    }
+    
+    /* Image library modal - header images only */
+    .grid.grid-cols-2.md\:grid-cols-3.lg\:grid-cols-4 img[src*="header"] {
+        max-width: 100% !important;
+        max-height: 120px !important;
+        width: 100% !important;
+        height: 120px !important;
+        object-fit: cover !important;
+        object-position: center !important;
+    }
+    
+    /* Image library grid - header images only */
+    .image-library-grid img[src*="header"] {
+        max-height: 150px !important;
+        height: 150px !important;
+        width: 100% !important;
+        object-fit: cover !important;
+        object-position: center !important;
+    }
+    
+    /* Force all header images to be constrained */
+    img[src*="header"] {
+        max-width: 100% !important;
+        max-height: 200px !important;
+        object-fit: cover !important;
+        object-position: center !important;
+    }
+    
+    /* Template preview card containers */
+    .border.rounded-lg.overflow-hidden > div:first-child {
+        max-height: 150px !important;
+        overflow: hidden !important;
+    }
+    
+    /* Image library modal containers */
+    .grid.grid-cols-2.md\:grid-cols-3.lg\:grid-cols-4 .relative {
+        max-height: 120px !important;
+        overflow: hidden !important;
+    }
+    
+    /* DO NOT affect body, banner, or footer images */
+    img[src*="body"],
+    img[src*="banner"],
+    img[src*="footer"] {
+        /* No constraints - let them display naturally */
+    }
+    </style>
+
+    <!-- Shared auth redirect helper for layout-backed pages -->
+    <script>
+    (function() {
+        window.__cbRedirectToLogin = function(reason, meta) {
+            try {
+                var current = window.location.pathname;
+                if (current === '/login') return;
+                window.location.replace('/login');
+            } catch (e) {
+                window.location.replace('/login');
+            }
+        };
+        window.__cbHandle401 = function(resp, meta) {
+            if (resp && resp.status === 401) {
+                window.__cbRedirectToLogin('HTTP_401', meta || {});
+                return true;
+            }
+            return false;
+        };
+        window.redirectToLogin = function(reason, extraParams) { window.__cbRedirectToLogin(reason || 'UNKNOWN', extraParams); };
+        window.redirectToLoginOn401 = function(response, context) {
+            if (response && response.status === 401) {
+                window.__cbRedirectToLogin('HTTP_401', context || {});
+                return true;
+            }
+            return false;
+        };
+    })();
+    </script>
+
+</head>
+<body class="bg-gray-100">
+    <!-- Skip to content link for accessibility -->
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    
+    <%- body %>
+    <% var _isElection = (typeof user !== 'undefined' && user && (user.electionMode || user.accountType === 'election')); if (_isElection) { %></div></div></div><% } %>
+    <%- typeof(script) != 'undefined' ? script : '' %>
+    
+    <script>
+    (function() {
+    if (window.location.pathname === '/login') { return; }
+    // Mobile authentication helper
+    function isMobileDevice() {
+        return /iPad|iPhone|iPod|Android|Mobile|Tablet/.test(navigator.userAgent);
+    }
+    
+    function getAuthToken() {
+        // If token is in URL, server will set cookie and redirect; clean URL without storing token in DOM
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlToken = urlParams.get('token');
+        if (urlToken) {
+            const newUrl = window.location.pathname + (window.location.search.replace(/[?&]token=[^&]*/, '').replace(/^\?$/, ''));
+            window.history.replaceState({}, document.title, newUrl);
+        }
+        return localStorage.getItem('token');
+    }
+    getAuthToken();
+    
+    // Use cookies only; do not add token to URLs or DOM
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+        if (typeof options.credentials === 'undefined' && (url.startsWith('/api/') || url.startsWith(window.location.origin + '/api/'))) {
+            options = { ...options, credentials: 'include' };
+        }
+        return originalFetch(url, options);
+    };
+    
+    function toggleMobileMenu() {
+        const mobileMenu = document.getElementById('mobileMenu');
+        mobileMenu.classList.toggle('hidden');
+    }
+    window.toggleMobileMenu = toggleMobileMenu;
+
+    async function updateTokenBalances() {
+        var p = window.location.pathname || '';
+        if (p === '/login' || p.indexOf('/election/scrutineering') !== -1) { return; }
+        var response;
+        var data;
+        try {
+            var controller = new AbortController();
+            var timeoutId = setTimeout(function() { controller.abort(); }, 8000);
+            response = await fetch('/api/me', { method: 'GET', credentials: 'include', signal: controller.signal });
+            clearTimeout(timeoutId);
+            if (!response.ok) {
+                window.location.replace('/login');
+                return;
+            }
+            data = await response.json();
+        } catch (e) {
+            window.location.replace('/login');
+            return;
+        }
+
+        if (!data || data.authenticated !== true || !data.user) {
+            window.location.replace('/login');
+            return;
+        }
+
+        var userData = data.user;
+        var balanceElement = document.getElementById('tokenBalances');
+        if (balanceElement) {
+            var smsTokens = typeof userData.smsTokens === 'object' ? (userData.smsTokens.balance || 0) : (userData.smsTokens || 0);
+            var emailTokens = typeof userData.emailTokens === 'object' ? (userData.emailTokens.balance || 0) : (userData.emailTokens || 0);
+            var aiTokens = userData.aiTokens || 0;
+            balanceElement.textContent = 'SMS: ' + smsTokens + ' | Email: ' + emailTokens + ' | AI: ' + aiTokens;
+        }
+
+        if (userData.userType === 'user') {
+            ['/my-numbers', '/my-tokens'].forEach(function(path) {
+                document.querySelectorAll('a[href="' + path + '"]').forEach(function(link) {
+                    if (link) link.style.display = 'none';
+                });
+            });
+        }
+
+        var emailElement = document.getElementById('userEmail');
+        if (emailElement) {
+            var companyName = userData.company && typeof userData.company === 'object' ? userData.company.name : (typeof userData.company === 'string' ? userData.company : null);
+            var display = (companyName && userData.username) ? 'Logged in as: ' + companyName + ' (' + userData.username + ')' : (companyName ? 'Logged in as: ' + companyName : (userData.username ? 'Logged in as: ' + userData.username : 'Logged in as: ' + (userData.email || '')));
+            emailElement.textContent = display;
+        }
+    }
+
+    // Logout: redirect to /login after cookie clear.
+    async function logout() {
+        try {
+            await fetch('/api/logout', {
+                method: 'POST',
+                credentials: 'include'
+            });
+        } catch (error) {
+            console.error('Logout error:', error);
+        }
+        localStorage.removeItem('token');
+        localStorage.removeItem('refreshToken');
+        window.location.href = '/login';
+    }
+    window.logout = logout;
+
+    // Add these variables and functions for mobile menu
+    let showMobileMessages = false;
+    let showMobileAdmin = false;
+
+    function toggleMobileMessages() {
+        showMobileMessages = !showMobileMessages;
+        const dropdownContent = document.getElementById('mobileMessagesDropdown');
+        const dropdownArrow = document.getElementById('mobileMessagesArrow');
+        
+        if (showMobileMessages) {
+            dropdownContent.classList.remove('hidden');
+            dropdownArrow.classList.add('transform', 'rotate-180');
+        } else {
+            dropdownContent.classList.add('hidden');
+            dropdownArrow.classList.remove('transform', 'rotate-180');
+        }
+    }
+
+    function toggleMobileAdmin() {
+        showMobileAdmin = !showMobileAdmin;
+        const dropdownContent = document.getElementById('mobileAdminDropdown');
+        const dropdownArrow = document.getElementById('mobileAdminArrow');
+        
+        if (showMobileAdmin) {
+            dropdownContent.classList.remove('hidden');
+            dropdownArrow.classList.add('transform', 'rotate-180');
+        } else {
+            dropdownContent.classList.add('hidden');
+            dropdownArrow.classList.remove('transform', 'rotate-180');
+        }
+    }
+    window.toggleMobileAdmin = toggleMobileAdmin;
+
+    // Initialize when DOM is loaded
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.getElementById('page-scrutineering')) return;
+        if (window.location.pathname === '/login') return;
+        var pathname = window.location.pathname || '';
+        if (pathname.indexOf('scrutineering') !== -1) return;
+        updateTokenBalances();
+        setInterval(updateTokenBalances, 30000);
+
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const mobileMenu = document.getElementById('mobileMenu');
+            const mobileButton = event.target.closest('button');
+            
+            if (!mobileButton && !event.target.closest('#mobileMenu') && !mobileMenu.classList.contains('hidden')) {
+                mobileMenu.classList.add('hidden');
+            }
+        });
+
+        // Add to the existing document.addEventListener for outside clicks
+        document.addEventListener('click', function(event) {
+            const mobileMenu = document.getElementById('mobileMenu');
+            const mobileButton = event.target.closest('button');
+            const messagesDropdown = document.getElementById('mobileMessagesDropdown');
+            const adminDropdown = document.getElementById('mobileAdminDropdown');
+            
+            if (!mobileButton && !event.target.closest('#mobileMessagesDropdown') && !mobileMenu.classList.contains('hidden')) {
+                messagesDropdown.classList.add('hidden');
+                showMobileMessages = false;
+            }
+            
+            if (!mobileButton && !event.target.closest('#mobileAdminDropdown') && !mobileMenu.classList.contains('hidden')) {
+                adminDropdown.classList.add('hidden');
+                showMobileAdmin = false;
+            }
+        });
+    });
+    
+    // ================== KEYBOARD NAVIGATION ==================
+    
+    // Global keyboard navigation handler
+    function initializeKeyboardNavigation() {
+        // Enhanced form navigation
+        document.addEventListener('keydown', function(e) {
+            // Handle form navigation with Enter key
+            if (e.key === 'Enter' && e.target.type !== 'textarea' && e.target.tagName !== 'BUTTON') {
+                const focusable = Array.from(document.querySelectorAll(
+                    'input:not([disabled]), button:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                ));
+                const currentIndex = focusable.indexOf(e.target);
+                const nextElement = focusable[currentIndex + 1];
+                
+                if (nextElement) {
+                    e.preventDefault();
+                    nextElement.focus();
+                }
+            }
+            
+            // Handle modal close with Escape
+            if (e.key === 'Escape') {
+                const openModals = document.querySelectorAll('.modal[aria-hidden="false"]');
+                openModals.forEach(modal => {
+                    const closeFunction = modal.getAttribute('data-close-function');
+                    if (closeFunction && window[closeFunction]) {
+                        window[closeFunction]();
+                    }
+                });
+            }
+        });
+        
+        // Add visual focus indicators
+        document.addEventListener('focusin', function(e) {
+            e.target.classList.add('keyboard-focused');
+        });
+        
+        document.addEventListener('focusout', function(e) {
+            e.target.classList.remove('keyboard-focused');
+        });
+        
+        // Initialize dropdown keyboard navigation
+        initializeDropdownNavigation();
+        
+        // Initialize table navigation for any tables on the page
+        const tables = document.querySelectorAll('table');
+        tables.forEach((table, index) => {
+            if (!table.id) table.id = `table-${index}`;
+            initializeTableNavigation(table.id);
+        });
+    }
+    
+    // Dropdown keyboard navigation
+    function initializeDropdownNavigation() {
+        const dropdowns = document.querySelectorAll('[role="menu"], [role="listbox"]');
+        
+        dropdowns.forEach(dropdown => {
+            dropdown.addEventListener('keydown', function(e) {
+                const items = this.querySelectorAll('[role="menuitem"], [role="option"]');
+                let currentIndex = Array.from(items).findIndex(item => item === document.activeElement);
+                
+                switch(e.key) {
+                    case 'ArrowDown':
+                        e.preventDefault();
+                        currentIndex = Math.min(currentIndex + 1, items.length - 1);
+                        items[currentIndex].focus();
+                        break;
+                    case 'ArrowUp':
+                        e.preventDefault();
+                        currentIndex = Math.max(currentIndex - 1, 0);
+                        items[currentIndex].focus();
+                        break;
+                    case 'Home':
+                        e.preventDefault();
+                        items[0].focus();
+                        break;
+                    case 'End':
+                        e.preventDefault();
+                        items[items.length - 1].focus();
+                        break;
+                    case 'Enter':
+                    case ' ':
+                        e.preventDefault();
+                        document.activeElement.click();
+                        break;
+                }
+            });
+        });
+    }
+    
+    // Table keyboard navigation
+    function initializeTableNavigation(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        
+        const rows = table.querySelectorAll('tbody tr');
+        let currentRow = 0;
+        let currentCell = 0;
+        
+        function highlightCell(row, cell) {
+            // Remove previous highlights
+            table.querySelectorAll('.keyboard-focus').forEach(el => el.classList.remove('keyboard-focus'));
+            
+            const targetRow = rows[row];
+            if (targetRow) {
+                const cells = targetRow.querySelectorAll('td, th');
+                if (cells[cell]) {
+                    cells[cell].classList.add('keyboard-focus');
+                    cells[cell].scrollIntoView({ block: 'nearest' });
+                    
+                    // Focus on interactive elements within cell
+                    const interactive = cells[cell].querySelector('button, input, select, a');
+                    if (interactive) interactive.focus();
+                }
+            }
+        }
+        
+        table.addEventListener('keydown', function(e) {
+            const maxRows = rows.length - 1;
+            const currentRowElement = rows[currentRow];
+            const maxCells = currentRowElement ? currentRowElement.querySelectorAll('td, th').length - 1 : 0;
+            
+            switch(e.key) {
+                case 'ArrowUp':
+                    e.preventDefault();
+                    if (currentRow > 0) {
+                        currentRow--;
+                        highlightCell(currentRow, currentCell);
+                    }
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (currentRow < maxRows) {
+                        currentRow++;
+                        highlightCell(currentRow, currentCell);
+                    }
+                    break;
+                case 'ArrowLeft':
+                    e.preventDefault();
+                    if (currentCell > 0) {
+                        currentCell--;
+                        highlightCell(currentRow, currentCell);
+                    }
+                    break;
+                case 'ArrowRight':
+                    e.preventDefault();
+                    if (currentCell < maxCells) {
+                        currentCell++;
+                        highlightCell(currentRow, currentCell);
+                    }
+                    break;
+                case 'Enter':
+                case ' ':
+                    e.preventDefault();
+                    const cell = rows[currentRow]?.querySelectorAll('td, th')[currentCell];
+                    const button = cell?.querySelector('button, a');
+                    if (button) button.click();
+                    break;
+            }
+        });
+        
+        // Initialize first cell focus
+        if (rows.length > 0) {
+            table.setAttribute('tabindex', '0');
+            highlightCell(0, 0);
+        }
+    }
+    
+    // Focus trap for modals
+    function trapFocus(modalId) {
+        const modal = document.getElementById(modalId);
+        if (!modal) return;
+        
+        const focusableElements = modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+        
+        function handleTabKey(e) {
+            if (e.key === 'Tab') {
+                if (e.shiftKey) {
+                    if (document.activeElement === firstElement) {
+                        lastElement.focus();
+                        e.preventDefault();
+                    }
+                } else {
+                    if (document.activeElement === lastElement) {
+                        firstElement.focus();
+                        e.preventDefault();
+                    }
+                }
+            }
+        }
+        
+        modal.addEventListener('keydown', handleTabKey);
+        if (firstElement) firstElement.focus();
+        
+        return () => modal.removeEventListener('keydown', handleTabKey);
+    }
+    
+    // Initialize keyboard navigation when DOM is ready
+    // Admin dropdown hover functions
+    function showAdminDropdown(type) {
+        const dropdownId = type === 'desktop' ? 'adminDropdownDesktop' : 'adminDropdownTablet';
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) {
+            dropdown.classList.remove('hidden');
+            dropdown.classList.add('block');
+        }
+    }
+    
+    function hideAdminDropdown(type) {
+        const dropdownId = type === 'desktop' ? 'adminDropdownDesktop' : 'adminDropdownTablet';
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('block');
+        }
+    }
+    window.showAdminDropdown = showAdminDropdown;
+    window.hideAdminDropdown = hideAdminDropdown;
+
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeKeyboardNavigation();
+    });
+    })();
+    </script>
+</body>
+</html>

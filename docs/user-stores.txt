@@ -1,0 +1,77 @@
+# User Stories - Campaign Builder Application
+
+## User Registration & Authentication
+As a user, I want to register for an account so that I can access the campaign builder platform.
+As a user, I want to verify my email after registration so that I can ensure my account is secured and prevent unauthorized sign-ups.
+As a user, I want to enable two-factor authentication (2FA) so that I can add an extra layer of security to my account.
+As a user, I want to log in securely so that I can access my account and manage my campaigns.
+
+## Token Management
+As a user, I want to purchase tokens so that I can send SMS and email messages.
+As a user, I want to see my current token balance so that I can track my usage and remaining credits.
+As a user, I want to receive an alert when my token balance is low so that I can top up before running out.
+As a user, I want to see my token purchase history so that I can track my expenses and past transactions.
+As a user, I want to automatically receive a receipt or invoice via email after purchasing tokens, so that I have proper documentation for personal or organizational reimbursement.
+As a user, I want to view detailed invoices with payment status so that I can manage my billing and expenses.
+
+## Contact Management
+As a user, I want to import and manage my contacts so that I can easily send messages without manually entering numbers or emails each time.
+As a user, I want to add new contacts with complete information (name, email, phone, address) so that I can build a comprehensive contact database.
+As a user, I want to edit existing contact information so that I can keep my contact list up to date.
+As a user, I want to categorize contacts so that I can organize them for targeted messaging campaigns.
+As a user, I want to search and filter contacts so that I can quickly find specific individuals or groups.
+As a user, I want to delete contacts so that I can maintain a clean and accurate contact list.
+As a user, I want to delete all contacts at once so that I can reset my contact database when needed.
+As a user, I want automatic address autocomplete so that I can quickly add accurate address information.
+As a user, I want postal code lookup to automatically fill city and province information so that I can save time when adding contacts.
+
+## Template Management
+As a user, I want to create message templates so that I can quickly send recurring messages without typing them repeatedly.
+As a user, I want to build templates for email and SMS campaigns using AI so that I can create professional content quickly.
+As a user, I want to generate AI images for my templates (header, banner, body, footer) so that I can create visually appealing campaigns.
+As a user, I want to choose from different AI image styles (realistic, artistic, minimalist, vintage, modern) so that I can match my brand aesthetic.
+As a user, I want to generate AI images that are automatically generated with the recommended size for the template section it is in (header, banner, body, footer).
+As a user, I want to generate AI HTML content for template body sections so that I can create engaging email content.
+As a user, I want to preview templates before sending so that I can ensure they look correct.
+As a user, I want to remove images from templates so that I can easily edit and refine my designs.
+As a user, I want to categorize templates (marketing, newsletter, promotional, announcement, welcome, other) so that I can organize my content.
+As a user, I want to add tags to templates so that I can easily search and filter my template library.
+
+## Messaging Features
+As a user, I want to send SMS messages to my contacts so that I can communicate via text.
+As a user, I want to send email messages to my contacts so that I can communicate via email.
+As a user, I want to schedule SMS or email messages so that I can send communications at a specific time.
+As a user, I want to see the delivery status of my sent messages (sent, delivered, failed) so that I can confirm successful delivery.
+As a user, I want to see when an email recipient opens their message so that I can track engagement and confirm delivery.
+As a user, I want to see contact names instead of phone numbers in message responses so that I can easily identify who is responding.
+As a user, I want to use templates when sending messages so that I can maintain consistency and save time.
+As a user, I want to send messages to multiple contacts at once so that I can run efficient campaigns.
+
+## Phone Number Management
+As a user, I want to purchase dedicated phone numbers so that I can have a professional business line for SMS campaigns.
+As a user, I want to manage my purchased phone numbers so that I can track usage and costs.
+As a user, I want to see phone number purchase history so that I can manage my telecommunications expenses.
+
+## Account & Settings
+As a user, I want to view my account dashboard so that I can see an overview of my usage and activity.
+As a user, I want to delete my account and all associated data so that I can ensure my privacy when I no longer need the service.
+As a user, I want to set an auto-reply for emails or SMS so that I can send automated responses when unavailable.
+As a user, I want to view my message history so that I can track past communications.
+As a user, I want to access training materials so that I can learn how to use the platform effectively.
+
+## Admin & Support Features
+As an admin, I want to monitor user activity and token usage so that I can prevent abuse or fraudulent transactions.
+As an admin, I want to process refund requests or manually adjust token balances so that I can handle customer service issues.
+As an admin, I want to manage user accounts so that I can provide support and maintain system integrity.
+As a user, I want to contact support through a help center or ticket system so that I can get assistance when needed.
+
+## Reporting & Analytics
+As a user, I want to view SMS reports so that I can track delivery rates and engagement.
+As a user, I want to view email reports so that I can track open rates and click-through rates.
+As a user, I want to see my campaign performance metrics so that I can optimize future campaigns.
+
+## User Experience Enhancements
+As a user, I want a responsive interface that works on mobile and desktop so that I can manage campaigns from any device.
+As a user, I want clear error messages and notifications so that I can understand what's happening with my actions.
+As a user, I want a professional and intuitive interface so that I can focus on creating effective campaigns rather than learning complex software.
+

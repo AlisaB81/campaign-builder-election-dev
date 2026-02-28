@@ -1,0 +1,116 @@
+# Global Coding, Safety, and Architecture Rules for Cursor AI
+
+The model MUST follow all rules below when reading, writing, or modifying code or configuration.
+
+====================================================================
+SCOPE & CHANGE CONTROL
+====================================================================
+• Only touch the files and parts of the codebase necessary for the user’s request.
+• Do NOT "clean up", "refactor", or reorganize unrelated areas unless explicitly requested.
+• Do NOT rename existing models, tables, columns, or API contracts without explicit user approval.
+• Avoid large, sweeping changes (e.g., global search-and-replace) unless the user clearly asks for it.
+• Preserve existing behaviour and backward compatibility as much as possible.
+
+If a change could break existing data, APIs, or user flows:
+→ Explain the risk and propose a safe plan first, THEN implement only if the user agrees.
+
+====================================================================
+DATABASE & DATA INTEGRITY
+====================================================================
+The database and stored data MUST be treated as critical and fragile.
+
+• Default to **READ-ONLY** behaviour unless the user explicitly asks for data-changing code.
+• NEVER write code that drops tables, truncates tables, or deletes large sets of records automatically.
+    - No `DROP TABLE`, `TRUNCATE`, or destructive migrations unless the user clearly requests it.
+• Prefer **non-destructive changes**:
+    - Add columns instead of renaming/removing existing ones.
+    - Use soft-delete flags (e.g., `isDeleted`, `deletedAt`) instead of hard deletes when possible.
+• For any DELETE, UPDATE, or migration logic:
+    - ALWAYS scope by tenant/account/clinic/user where applicable.
+    - ALWAYS include safe filters (e.g., `WHERE id = ?` AND `accountId = ?`).
+    - NEVER act on “all rows” by default.
+
+When generating scripts or tools that modify data:
+• Provide a DRY-RUN or PREVIEW mode that logs what WOULD happen instead of actually doing it.
+• Require explicit confirmation (from the user) before finalizing destructive operations.
+• Log changes in a reversible way when possible (e.g., backups, audit logs).
+
+Migrations:
+• Write migrations to be **reversible** where possible (up/down or equivalent).
+• Never remove or repurpose columns without migration notes and user confirmation.
+• Assume production data exists and must NOT be corrupted or reset.
+
+====================================================================
+MULTI-TENANT & ACCESS CONTROL
+====================================================================
+If the system is multi-tenant (accounts/clinics/users):
+
+• Every query that reads or writes user-related data MUST be scoped to the correct tenant/account/clinic ID.
+• NEVER return or modify data belonging to a different tenant.
+• Avoid any “global” queries that are not explicitly admin-only.
+
+====================================================================
+SECURITY & SECRETS
+====================================================================
+• NEVER hardcode API keys, credentials, salts, tokens, or secrets in code.
+• Use environment variables or secure configuration mechanisms for secrets.
+• Do NOT log secrets or sensitive PII.
+• Avoid deprecated or high-risk dependencies; prefer maintained, reputable libraries.
+• Sanitize all external input to prevent SQL injection, XSS, and similar attacks.
+• If the user asks for an insecure pattern, warn them and propose a safer alternative.
+
+====================================================================
+SCALABILITY & PERFORMANCE
+====================================================================
+• Design solutions to scale beyond small test datasets.
+• Use efficient queries; avoid N+1 patterns and unbounded SELECT * on large tables.
+• Prefer non-blocking I/O, pagination, and caching where it makes sense.
+• Build with multi-tenant scale in mind (indexes, scoped queries, background jobs).
+
+====================================================================
+CODE QUALITY & MAINTAINABILITY
+====================================================================
+• Keep code readable and structured; comment only where logic is non-obvious.
+• Use clear, consistent naming for functions, variables, and modules.
+• Respect separation of concerns:
+    - Controllers/routers: HTTP + request handling
+    - Services: business logic
+    - Data layer: DB access / queries
+• Avoid duplicating logic; extract helpers/services where reusable.
+• Preserve backward compatibility when modifying public APIs, DB schemas, or core services; when breaking changes are unavoidable, explain them clearly and outline migration steps.
+
+====================================================================
+ENVIRONMENT & DEPENDENCIES
+====================================================================
+• Do not introduce outdated, deprecated, or clearly insecure dependencies.
+• Prefer libraries that are actively maintained.
+• Assume separate environments: local, staging, production.
+• Do not rely on environment-specific hacks; keep config clean and centralized.
+• Provide notes for any new env vars or setup steps (e.g., `ENV_VAR_NAME` and where it’s used).
+
+====================================================================
+USER-DATA ETHICS & PRIVACY
+====================================================================
+• Do NOT log sensitive user data unless absolutely necessary, and then only in a minimized/anonymized form.
+• Minimize data retention; do not invent unnecessary data collection.
+• Avoid building features that expose private data to other tenants/users.
+
+====================================================================
+OUTPUT & RESPONSE STYLE
+====================================================================
+• When a change could affect existing data, migrations, or deletion:
+    → EXPLICITLY call out the risk and suggested safeguards (backup, dry-run, tests).
+• Provide production-ready code when possible (not just pseudocode), unless the user asks otherwise.
+• Suggest tests (unit/integration) for critical logic, especially around DB, auth, or billing.
+• If there is ambiguity about requirements, prefer to ASK the user a clarifying question instead of guessing.
+• Never perform destructive operations “for convenience” or to simplify the code.
+
+====================================================================
+PRIMARY GOAL
+====================================================================
+Generate secure, **non-destructive**, scalable, and maintainable code that:
+• Preserves existing data and behaviour,
+• Respects tenant and access boundaries,
+• Avoids corruption or accidental deletion of records,
+• Minimizes technical debt and future migration pain.
+

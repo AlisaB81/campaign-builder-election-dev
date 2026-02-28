@@ -1,0 +1,62 @@
+{
+	"folders": [
+		{
+			"path": "../../public_html"
+		},
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"projectColors.mainColor": "#1f0fff",
+		"window.title": "1770846971836",
+		"workbench.colorCustomizations": {
+			"statusBarItem.warningBackground": "#36e250",
+			"statusBarItem.warningForeground": "#000000",
+			"statusBarItem.warningHoverBackground": "#36e250",
+			"statusBarItem.warningHoverForeground": "#00000090",
+			"statusBarItem.remoteBackground": "#43ef5d",
+			"statusBarItem.remoteForeground": "#000000",
+			"statusBarItem.remoteHoverBackground": "#50fc6a",
+			"statusBarItem.remoteHoverForeground": "#00000090",
+			"statusBar.background": "#36e250",
+			"statusBar.foreground": "#000000",
+			"statusBar.border": "#36e250",
+			"statusBar.debuggingBackground": "#36e250",
+			"statusBar.debuggingForeground": "#000000",
+			"statusBar.debuggingBorder": "#36e250",
+			"statusBar.noFolderBackground": "#36e250",
+			"statusBar.noFolderForeground": "#000000",
+			"statusBar.noFolderBorder": "#36e250",
+			"statusBar.prominentBackground": "#36e250",
+			"statusBar.prominentForeground": "#000000",
+			"statusBar.prominentHoverBackground": "#36e250",
+			"statusBar.prominentHoverForeground": "#00000090",
+			"focusBorder": "#36e25099",
+			"progressBar.background": "#36e250",
+			"textLink.foreground": "#76ff90",
+			"textLink.activeForeground": "#83ff9d",
+			"selection.background": "#29d543",
+			"list.highlightForeground": "#36e250",
+			"list.focusAndSelectionOutline": "#36e25099",
+			"button.background": "#36e250",
+			"button.foreground": "#000000",
+			"button.hoverBackground": "#43ef5d",
+			"tab.activeBorderTop": "#43ef5d",
+			"pickerGroup.foreground": "#43ef5d",
+			"list.activeSelectionBackground": "#36e2504d",
+			"panelTitle.activeBorder": "#43ef5d",
+			"activityBar.activeBorder": "#36e250",
+			"activityBarBadge.foreground": "#000000",
+			"activityBarBadge.background": "#36e250"
+		},
+		"projectColors.name": "Campaign Builder",
+		"projectColors.isActivityBarColored": false,
+		"projectColors.isTitleBarColored": false,
+		"projectColors.isStatusBarColored": true,
+		"projectColors.isProjectNameColored": true,
+		"projectColors.isActiveItemsColored": true,
+		"projectColors.setWindowTitle": true,
+		"git.ignoreLimitWarning": true
+	}
+}

@@ -1,0 +1,521 @@
+<%- include('partials/nav') %>
+
+<% 
+const isElectionAccount = (typeof user !== 'undefined' && user && (user.electionMode || user.accountType === 'election'));
+%>
+
+<div id="app" class="px-4 sm:px-6 lg:px-8" style="width: 100%; max-width: 80rem; margin-left: auto; margin-right: auto;">
+    <div class="py-6 space-y-8">
+    <!-- Page Header -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center justify-between flex-wrap gap-3">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Voter Interactions</h1>
+                <p class="mt-1 text-sm text-gray-500">Track and manage voter contact history and support levels</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <a v-if="returnToUrl" :href="returnToUrl" 
+                   class="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 text-sm font-medium">
+                    ← Return to Navigation
+                </a>
+                <button @click="showRecordModal = true" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium">
+                    Record Interaction
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-green-100 rounded-md p-3">
+                    <svg class="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Strong Support</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ stats.strong }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-yellow-100 rounded-md p-3">
+                    <svg class="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Leaning</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ stats.leaning }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-red-100 rounded-md p-3">
+                    <svg class="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Opposed</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ stats.opposed }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center">
+                <div class="flex-shrink-0 bg-gray-100 rounded-md p-3">
+                    <svg class="h-6 w-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <p class="text-sm font-medium text-gray-500">Undecided</p>
+                    <p class="text-2xl font-semibold text-gray-900">{{ stats.undecided }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API error banner -->
+    <div v-if="loadError" class="rounded-md bg-red-50 p-4 border border-red-200">
+        <div class="flex justify-between items-start">
+            <p class="text-sm text-red-700">{{ loadError }}</p>
+            <button @click="loadError = null" class="text-red-500 hover:text-red-700 text-sm font-medium">Dismiss</button>
+        </div>
+        <p class="mt-1 text-xs text-red-600">Ensure PostgreSQL is running and election migrations have been applied. Then <button @click="loadInteractions()" class="underline font-medium">retry</button>.</p>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Support Level</label>
+                <select v-model="filters.supportCategory" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">All Levels</option>
+                    <option value="strong">Strong Support (80-100)</option>
+                    <option value="leaning">Leaning (60-79)</option>
+                    <option value="undecided">Undecided (40-59)</option>
+                    <option value="opposed">Opposed (0-39)</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Contact Method</label>
+                <select v-model="filters.interactionMethod" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">All Methods</option>
+                    <option value="in_person">In Person</option>
+                    <option value="phone">Phone</option>
+                    <option value="email">Email</option>
+                    <option value="text">Text</option>
+                    <option value="mail">Mail</option>
+                    <option value="online">Online</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Search Contact</label>
+                <input type="text" v-model="filters.contactSearch" placeholder="Name, email, or phone" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div class="flex items-end">
+                <button @click="loadInteractions()" 
+                        class="w-full px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 font-medium">
+                    Search
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interactions Table -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Recent Interactions</h2>
+            <button @click="loadInteractions()" 
+                    class="px-3 py-1 text-sm text-indigo-600 hover:text-indigo-800">
+                Refresh
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Support Level</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Method</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Notes</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recorded By</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-if="loading">
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            Loading interactions...
+                        </td>
+                    </tr>
+                    <tr v-else-if="interactions.length === 0">
+                        <td colspan="6" class="px-6 py-4 text-center text-gray-500">
+                            No interactions found. Click "Record Interaction" to add one.
+                        </td>
+                    </tr>
+                    <tr v-for="interaction in interactions" :key="interaction.id">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ interaction.contact_name || [interaction.first_name, interaction.last_name].filter(Boolean).join(' ') || 'Unknown' }}
+                            </div>
+                            <div class="text-sm text-gray-500">{{ interaction.contact_email || interaction.contact_phone || '' }}</div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span :class="getSupportBadgeClass(interaction.support_likelihood)" 
+                                  class="px-2 py-1 text-xs font-medium rounded-full">
+                                {{ getSupportLabel(interaction.support_likelihood) }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 capitalize">{{ interaction.interaction_method || '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDate(interaction.created_at) }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            <div class="max-w-xs truncate" :title="interaction.notes">
+                                {{ interaction.notes || '-' }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ interaction.created_by_email || 'Unknown' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Record Interaction Modal (must be inside #app for Vue to control it) -->
+    <div v-if="showRecordModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50" @click.self="showRecordModal = false">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Record Interaction</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Search Contact *</label>
+                        <input type="text" v-model="interactionForm.contactSearch" 
+                               @input="searchContacts"
+                               placeholder="Name, email, or phone"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <div v-if="contactSearchResults.length > 0" class="mt-2 border border-gray-200 rounded-md max-h-40 overflow-y-auto">
+                            <div v-for="contact in contactSearchResults" 
+                                 :key="contact.id"
+                                 @click="selectContact(contact)"
+                                 class="px-3 py-2 hover:bg-gray-100 cursor-pointer">
+                                <div class="font-medium">{{ contact.name || (contact.firstName + ' ' + contact.lastName) }}</div>
+                                <div class="text-sm text-gray-500">{{ contact.email || contact.phone }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="interactionForm.selectedContact">
+                        <div class="bg-gray-50 p-3 rounded-md mb-2">
+                            <div class="font-medium">{{ interactionForm.selectedContact.name || (interactionForm.selectedContact.firstName + ' ' + interactionForm.selectedContact.lastName) }}</div>
+                            <div class="text-sm text-gray-600">{{ interactionForm.selectedContact.email || interactionForm.selectedContact.phone }}</div>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Interaction Type *</label>
+                        <select v-model="interactionForm.interactionType" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="">Select type</option>
+                            <option value="door_knock">Door Knock</option>
+                            <option value="phone_call">Phone Call</option>
+                            <option value="email">Email</option>
+                            <option value="text_message">SMS / Text</option>
+                            <option value="event">Event</option>
+                            <option value="mailer">Mailer</option>
+                            <option value="social_media">Social Media</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Contact Method *</label>
+                        <select v-model="interactionForm.interactionMethod" required
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="">Select method</option>
+                            <option value="in_person">In Person</option>
+                            <option value="phone">Phone</option>
+                            <option value="email">Email</option>
+                            <option value="text">Text</option>
+                            <option value="mail">Mail</option>
+                            <option value="online">Online</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Support Likelihood (0-100) *</label>
+                        <input type="number" v-model.number="interactionForm.supportLikelihood" min="0" max="100" required
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <div class="mt-1 text-xs text-gray-500">
+                            <span v-if="interactionForm.supportLikelihood >= 80">Strong Support</span>
+                            <span v-else-if="interactionForm.supportLikelihood >= 60">Likely Support</span>
+                            <span v-else-if="interactionForm.supportLikelihood >= 40">Undecided</span>
+                            <span v-else-if="interactionForm.supportLikelihood >= 20">Likely Oppose</span>
+                            <span v-else-if="interactionForm.supportLikelihood >= 0">Strong Oppose</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Your full name *</label>
+                        <input type="text" v-model="interactionForm.recordedByName" required
+                               placeholder="First and last name"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                        <textarea v-model="interactionForm.notes" rows="3"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="showRecordModal = false" 
+                            class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                        Cancel
+                    </button>
+                    <button @click="submitInteraction" 
+                            :disabled="!interactionForm.selectedContact || !interactionForm.interactionType || !interactionForm.interactionMethod || interactionForm.supportLikelihood === null || !(interactionForm.recordedByName || '').trim() || submitting"
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">
+                        {{ submitting ? 'Recording...' : 'Record Interaction' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        const params = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+        const returnTo = params.get('returnTo') || '';
+        return {
+            returnToUrl: returnTo ? (returnTo.startsWith('/') ? returnTo : '/' + returnTo) : '',
+            prefilledContactId: params.get('contactId') || null,
+            interactions: [],
+            stats: {
+                strong: 0,
+                leaning: 0,
+                opposed: 0,
+                undecided: 0
+            },
+            filters: {
+                supportCategory: '',
+                interactionMethod: '',
+                contactSearch: ''
+            },
+            loading: false,
+            loadError: null,
+            showRecordModal: false,
+            interactionForm: {
+                selectedContact: null,
+                contactSearch: '',
+                interactionType: '',
+                interactionMethod: '',
+                supportLikelihood: null,
+                notes: '',
+                recordedByName: ''
+            },
+            contactSearchResults: [],
+            submitting: false
+        }
+    },
+    async mounted() {
+        await this.loadInteractions();
+        await this.loadStats();
+        if (this.prefilledContactId && this.returnToUrl) {
+            const contact = await this.fetchContactById(this.prefilledContactId);
+            if (contact) {
+                this.selectContact(contact);
+                this.$nextTick(() => { this.showRecordModal = true; });
+            }
+        }
+    },
+    methods: {
+        async loadInteractions() {
+            this.loadError = null;
+            try {
+                this.loading = true;
+                let url = '/api/election/interactions';
+                const params = new URLSearchParams();
+                if (this.filters.supportCategory) params.append('supportCategory', this.filters.supportCategory);
+                if (this.filters.interactionMethod) params.append('interactionMethod', this.filters.interactionMethod);
+                if (this.filters.contactSearch) params.append('contactSearch', this.filters.contactSearch);
+                if (params.toString()) url += '?' + params.toString();
+                
+                const response = await fetch(url, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.interactions = data.interactions || [];
+                } else {
+                    const errBody = await response.json().catch(() => ({}));
+                    const msg = errBody.error || ('Request failed: ' + response.status);
+                    console.error('Failed to load interactions:', response.status, msg);
+                    this.loadError = msg;
+                }
+            } catch (error) {
+                console.error('Failed to load interactions:', error);
+                this.loadError = error.message || 'Failed to load interactions';
+            } finally {
+                this.loading = false;
+            }
+        },
+        async loadStats() {
+            try {
+                const response = await fetch('/api/election/interactions/statistics', {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Calculate stats from interactions
+                    this.stats.strong = this.interactions.filter(i => i.support_likelihood >= 80).length;
+                    this.stats.leaning = this.interactions.filter(i => i.support_likelihood >= 60 && i.support_likelihood < 80).length;
+                    this.stats.undecided = this.interactions.filter(i => i.support_likelihood >= 40 && i.support_likelihood < 60).length;
+                    this.stats.opposed = this.interactions.filter(i => i.support_likelihood < 40).length;
+                }
+            } catch (error) {
+                console.error('Failed to load stats:', error);
+            }
+        },
+        async fetchContactById(contactId) {
+            if (!contactId) return null;
+            try {
+                const res = await fetch('/api/election/contact/' + encodeURIComponent(contactId), { credentials: 'include' });
+                if (res.ok) return await res.json();
+            } catch (e) { console.error(e); }
+            return null;
+        },
+        async searchContacts() {
+            if (!this.interactionForm.contactSearch || this.interactionForm.contactSearch.length < 2) {
+                this.contactSearchResults = [];
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/contacts?search=${encodeURIComponent(this.interactionForm.contactSearch)}`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const contacts = await response.json();
+                    this.contactSearchResults = contacts.slice(0, 10);
+                }
+            } catch (error) {
+                console.error('Failed to search contacts:', error);
+            }
+        },
+        selectContact(contact) {
+            this.interactionForm.selectedContact = contact;
+            this.contactSearchResults = [];
+            const name = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() || '—';
+            this.interactionForm.contactSearch = name;
+        },
+        async submitInteraction() {
+            if (!this.interactionForm.selectedContact || !this.interactionForm.interactionType || !this.interactionForm.interactionMethod || this.interactionForm.supportLikelihood === null) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+            
+            try {
+                this.submitting = true;
+                const response = await fetch('/api/election/interactions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        contactId: this.interactionForm.selectedContact.id,
+                        interactionType: this.interactionForm.interactionType,
+                        interactionMethod: this.interactionForm.interactionMethod,
+                        supportLikelihood: this.interactionForm.supportLikelihood,
+                        notes: this.interactionForm.notes || null
+                    })
+                });
+                
+                if (response.ok) {
+                    this.showRecordModal = false;
+                    this.resetInteractionForm();
+                    await this.loadInteractions();
+                    await this.loadStats();
+                    if (this.returnToUrl) {
+                        if (confirm('Interaction recorded. Return to Navigation to continue your route?')) {
+                            window.location.href = this.returnToUrl;
+                            return;
+                        }
+                    } else {
+                        alert('Interaction recorded successfully!');
+                    }
+                } else {
+                    const error = await response.json();
+                    alert('Failed to record interaction: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to record interaction:', error);
+                alert('Failed to record interaction. Please try again.');
+            } finally {
+                this.submitting = false;
+            }
+        },
+        resetInteractionForm() {
+            this.interactionForm = {
+                selectedContact: null,
+                contactSearch: '',
+                interactionType: '',
+                interactionMethod: '',
+                supportLikelihood: null,
+                notes: '',
+                recordedByName: ''
+            };
+            this.contactSearchResults = [];
+        },
+        getSupportLabel(score) {
+            if (score === null || score === undefined) return 'Unknown';
+            if (score >= 80) return 'Strong Support';
+            if (score >= 60) return 'Likely Support';
+            if (score >= 40) return 'Undecided';
+            if (score >= 20) return 'Likely Oppose';
+            return 'Strong Oppose';
+        },
+        getSupportBadgeClass(score) {
+            if (score === null || score === undefined) return 'bg-gray-100 text-gray-800';
+            if (score >= 80) return 'bg-green-100 text-green-800';
+            if (score >= 60) return 'bg-yellow-100 text-yellow-800';
+            if (score >= 40) return 'bg-gray-100 text-gray-800';
+            if (score >= 20) return 'bg-orange-100 text-orange-800';
+            return 'bg-red-100 text-red-800';
+        },
+        formatDate(dateString) {
+            if (!dateString) return '-';
+            const date = new Date(dateString);
+            return date.toLocaleString();
+        }
+    },
+    watch: {
+        filters: {
+            deep: true,
+            handler() {
+                clearTimeout(this.searchTimeout);
+                this.searchTimeout = setTimeout(() => {
+                    this.loadInteractions();
+                }, 500);
+            }
+        }
+    }
+}).mount('#app');
+</script>

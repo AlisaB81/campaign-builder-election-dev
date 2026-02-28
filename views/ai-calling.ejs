@@ -1,0 +1,1784 @@
+<%- include('partials/nav') %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+	<div class="py-6 space-y-6">
+		<div class="bg-white shadow rounded-lg p-6">
+			<div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+				<div>
+					<h2 class="text-xl font-semibold text-gray-900">AI Calling</h2>
+					<p class="text-sm text-gray-600 mt-1">Set up automated voice campaigns in under 2 minutes. Choose a voice, write your message, select contacts, and launch.</p>
+				</div>
+				<div class="flex items-center space-x-2">
+					<span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">Powered by Twilio + OpenAI</span>
+				</div>
+			</div>
+
+		<!-- Tabs -->
+		<div class="border-b border-gray-200 mb-4">
+			<nav class="-mb-px flex space-x-6" aria-label="Tabs">
+				<button id="tabAgents" class="border-indigo-500 text-indigo-600 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium" onclick="VoiceCallingUI.showTab('agents')">Create Campaign</button>
+				<button id="tabHistory" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium" onclick="VoiceCallingUI.showTab('history')">Campaign History</button>
+				<button id="tabNotifications" class="border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium" onclick="VoiceCallingUI.showTab('notifications')">Responses</button>
+			</nav>
+		</div>
+
+		<!-- Quick Setup (Simplified Form) -->
+		<section id="panelAgents">
+			<div class="space-y-8">
+				<!-- Campaign Name -->
+				<div class="bg-white border border-gray-200 rounded-lg p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+						<svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"></path>
+						</svg>
+						Campaign Name
+					</h3>
+					<input id="campaignName" class="w-full border rounded px-3 py-2" placeholder="Enter a name for your campaign (e.g., 'Town Hall RSVP', 'Volunteer Recruitment', 'Election Survey')" maxlength="100" />
+					<p class="text-xs text-gray-500 mt-1">Give your campaign a memorable name to easily identify it in reports and responses.</p>
+				</div>
+
+				<!-- Voice & Language -->
+				<div class="bg-white border border-gray-200 rounded-lg p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+						<svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+						</svg>
+						Voice & Language
+					</h3>
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
+						<div>
+							<label class="block text-xs text-gray-600 mb-1">Voice</label>
+							<select id="agentVoice" class="border rounded px-3 py-2 w-full">
+								<option value="">Select a voice</option>
+								<option value="Polly.Joanna" data-lang="en-US">Joanna - Female (US)</option>
+								<option value="Polly.Matthew" data-lang="en-US">Matthew - Male (US)</option>
+								<option value="Polly.Chantal" data-lang="fr-CA">Chantal - Female (French Canadian)</option>
+								<option value="Polly.Emma" data-lang="en-GB">Emma - Female (British)</option>
+								<option value="Polly.Brian" data-lang="en-GB">Brian - Male (British)</option>
+								<option value="alice" data-lang="en-US">Alice - Generic Female (Basic)</option>
+								<option value="man" data-lang="en-US">Generic Male (Basic)</option>
+							</select>
+							<div class="mt-2">
+								<button id="previewVoice" class="px-4 py-2 bg-green-600 text-white border border-green-600 rounded hover:bg-green-700 text-sm w-full" onclick="VoiceCallingUI.previewVoice()">
+									🎧 Preview Voice (Free)
+								</button>
+							</div>
+							<p class="text-xs text-gray-500 mt-1">Preview uses actual Twilio Polly voice that will be used in real calls. Instant generation.</p>
+						</div>
+						<div>
+							<label class="block text-xs text-gray-600 mb-1">Language</label>
+							<select id="agentLanguage" class="border rounded px-3 py-2 w-full">
+								<option value="">Select a language</option>
+								<option value="en-CA">English (Canadian)</option>
+								<option value="en-US">English (American)</option>
+								<option value="en-GB">English (British)</option>
+								<option value="fr-CA">French (Canadian)</option>
+								<option value="fr-FR">French (France)</option>
+							</select>
+							<p class="text-xs text-gray-500 mt-1">Match your audience. English and French options prioritized for Canada.</p>
+						</div>
+					</div>
+				</div>
+
+				<!-- Agent Prompt -->
+				<div class="bg-white border border-gray-200 rounded-lg p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+						<svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+						</svg>
+						Campaign Message
+					</h3>
+					<textarea id="agentPrompt" class="w-full border rounded px-3 py-2 h-28" placeholder="Write exactly what you want the AI to say (e.g., candidate intro, event reminder, volunteer ask). Keep it short and friendly."></textarea>
+											<div class="mt-3 flex items-center justify-between">
+							<p class="text-xs text-gray-500">Example: "Hi, this is Alex with Jane Doe for Mayor. Can we count on your support? Our town hall is this Thursday at 7 PM. Press 1 to RSVP or 2 if you can't attend. Thanks!"</p>
+							<div class="flex justify-end">
+								<button id="previewCampaignAudio" class="px-6 py-2 bg-green-600 text-white border border-green-600 rounded hover:bg-green-700 text-sm" onclick="VoiceCallingUI.previewCampaignAudio()">
+									🎧 Preview Campaign (Free)
+								</button>
+							</div>
+						</div>
+					<p class="text-xs text-indigo-600 mt-2">💡 <strong>Tip:</strong> Include interactive options like "Press 1 for yes, 2 for no" to get better responses from contacts.</p>
+					<p class="text-xs text-blue-600 mt-1">🌍 <strong>Auto-Translation:</strong> Write your message in English - it will automatically translate to match your selected language (French, etc.).</p>
+				</div>
+
+				<!-- Contacts Selection -->
+				<div class="bg-white border border-gray-200 rounded-lg p-6">
+					<div class="flex items-center justify-between mb-4">
+						<h3 class="text-lg font-medium text-gray-900 flex items-center">
+							<svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+							</svg>
+							Contact Selection
+						</h3>
+						<a href="/contact-manager" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+							→ Manage Contacts
+						</a>
+					</div>
+					
+					<!-- Search and Filter Controls -->
+					<div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-4">
+						<div class="flex items-end">
+							<button class="bg-indigo-600 text-white border rounded px-4 py-2 text-sm hover:bg-indigo-700 w-full" onclick="VoiceCallingUI.loadContacts()">
+								🔍 Load Contacts
+							</button>
+						</div>
+						<div class="flex items-end">
+							<button class="bg-white border rounded px-4 py-2 text-sm hover:bg-gray-50 w-full" onclick="VoiceCallingUI.selectAllContacts()">
+								☑️ Select All
+							</button>
+						</div>
+						<div>
+							<label class="block text-xs text-gray-600 mb-1">Search</label>
+							<input id="contactSearch" class="border rounded px-3 py-2 w-full" placeholder="Name, email, city...">
+						</div>
+						<div>
+							<label class="block text-xs text-gray-600 mb-1">Category</label>
+							<select id="contactCategory" class="border rounded px-3 py-2 w-full">
+								<option value="">All Categories</option>
+							</select>
+						</div>
+					</div>
+					
+					<!-- Contact Count & Selection Summary -->
+					<div id="contactsSummary" class="mb-3 text-sm text-gray-600 hidden">
+						<span id="contactsCount">0 contacts loaded</span> • 
+						<span id="selectedCount">0 selected</span>
+					</div>
+					
+					<!-- Contacts List -->
+					<div id="contactsList" class="max-h-80 overflow-y-auto border rounded bg-white divide-y divide-gray-100">
+						<div class="p-8 text-center text-gray-500">
+							<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+							</svg>
+							<p>Click "Load Contacts" to select people for your campaign</p>
+							<p class="text-xs mt-1">Use search and category filters to find specific groups</p>
+						</div>
+					</div>
+					
+					<!-- Tips -->
+					<div class="mt-4 p-3 bg-blue-50 border border-blue-200 rounded">
+						<p class="text-xs text-blue-800">
+							💡 <strong>Campaign Tips:</strong> Start with 10-20 contacts for testing. Only contacts with valid phone numbers will be called. 
+							<a href="/contact-manager" class="underline">Add more contacts</a> if needed.
+						</p>
+					</div>
+				</div>
+
+				<!-- Launch Campaign -->
+				<div class="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg p-6">
+					<div class="flex items-center justify-between">
+						<div>
+							<h3 class="text-lg font-medium text-gray-900 mb-1">Ready to Launch?</h3>
+							<p class="text-sm text-gray-600">Review your settings and start your AI voice campaign</p>
+						</div>
+						<div class="flex space-x-3">
+							<button class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-medium shadow-sm transition-colors duration-200" onclick="VoiceCallingUI.quickStart()">
+								🚀 Start Campaign
+							</button>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Campaign History -->
+		<section id="panelHistory" class="hidden">
+			<div class="space-y-6">
+				<!-- Search and Filter -->
+				<div class="bg-white border border-gray-200 rounded-lg p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+						<svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+						Campaign History
+					</h3>
+					<div class="flex space-x-4 mb-4">
+						<input id="historySearchInput" class="flex-1 border rounded-lg px-3 py-2" placeholder="Search campaigns by name or content..." />
+						<button class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700" onclick="VoiceCallingUI.searchHistory()">
+							Search
+						</button>
+					</div>
+					<div class="flex items-center space-x-4 text-sm text-gray-600">
+						<span id="historyCount">0 campaigns</span>
+						<span id="historyFilter" class="hidden">Filtered results</span>
+					</div>
+				</div>
+
+				<!-- Campaign History List -->
+				<div class="bg-white border border-gray-200 rounded-lg">
+					<div id="historyList" class="divide-y divide-gray-100">
+						<div class="p-8 text-center text-gray-500">
+							<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+							</svg>
+							<p>No campaign history found</p>
+							<p class="text-xs mt-1">Past AI voice campaigns will appear here</p>
+						</div>
+					</div>
+					
+					<!-- Pagination -->
+					<div id="historyPagination" class="p-4 bg-gray-50 border-t hidden">
+						<div class="flex items-center justify-between text-sm">
+							<div class="text-gray-600">
+								<span id="historyPaginationInfo">Showing 0-0 of 0 campaigns</span>
+							</div>
+							<div class="flex items-center space-x-2">
+								<button id="historyPrevPage" class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+									← Previous
+								</button>
+								<span id="historyPageNumbers" class="px-2 text-gray-600"></span>
+								<button id="historyNextPage" class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+									Next →
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- Notifications -->
+		<section id="panelNotifications" class="hidden">
+			<div class="space-y-6">
+				<!-- Search and Filter -->
+				<div class="bg-white border border-gray-200 rounded-lg p-6">
+					<h3 class="text-lg font-medium text-gray-900 mb-4 flex items-center">
+						<svg class="w-5 h-5 text-indigo-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+						</svg>
+						Contact Responses
+					</h3>
+					
+					<!-- Search and Date Filters -->
+					<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+						<div class="lg:col-span-2">
+							<input id="notificationSearchInput" class="w-full border rounded-lg px-3 py-2" placeholder="Search by name, city, phone, campaign, or response..." />
+						</div>
+						<div class="flex space-x-2">
+							<button class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700" onclick="VoiceCallingUI.searchNotifications()">
+								Search
+							</button>
+							<button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700" onclick="VoiceCallingUI.exportResponses()">
+								📊 Export
+							</button>
+						</div>
+					</div>
+					
+					<!-- Date Range Filters -->
+					<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+						<div>
+							<label class="block text-xs text-gray-600 mb-1">From Date</label>
+							<input type="date" id="notificationStartDate" class="w-full border rounded px-3 py-2 text-sm" />
+						</div>
+						<div>
+							<label class="block text-xs text-gray-600 mb-1">To Date</label>
+							<input type="date" id="notificationEndDate" class="w-full border rounded px-3 py-2 text-sm" />
+						</div>
+						<div>
+							<label class="block text-xs text-gray-600 mb-1">Quick Filters</label>
+							<select id="notificationQuickFilter" class="w-full border rounded px-3 py-2 text-sm" onchange="VoiceCallingUI.applyQuickDateFilter()">
+								<option value="">All Time</option>
+								<option value="today">Today</option>
+								<option value="yesterday">Yesterday</option>
+								<option value="last7days">Last 7 Days</option>
+								<option value="last30days">Last 30 Days</option>
+								<option value="thisMonth">This Month</option>
+								<option value="lastMonth">Last Month</option>
+							</select>
+						</div>
+						<div class="flex items-end">
+							<button class="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 text-sm w-full" onclick="VoiceCallingUI.clearDateFilters()">
+								Clear Filters
+							</button>
+						</div>
+					</div>
+					
+					<div class="flex items-center space-x-4 text-sm text-gray-600">
+						<span id="notificationCount">0 responses</span>
+						<span id="notificationFilter" class="hidden">Filtered results</span>
+					</div>
+				</div>
+
+				<!-- Notifications List -->
+				<div class="bg-white border border-gray-200 rounded-lg">
+					<div id="notificationsList" class="divide-y divide-gray-100">
+						<div class="p-8 text-center text-gray-500">
+							<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+							</svg>
+							<p>No contact responses found</p>
+							<p class="text-xs mt-1">Contact responses from AI calls will appear here</p>
+						</div>
+					</div>
+					
+					<!-- Pagination -->
+					<div id="notificationsPagination" class="p-4 bg-gray-50 border-t hidden">
+						<div class="flex items-center justify-between text-sm">
+							<div class="text-gray-600">
+								<span id="paginationInfo">Showing 0-0 of 0 responses</span>
+							</div>
+							<div class="flex items-center space-x-2">
+								<button id="prevPage" class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+									← Previous
+								</button>
+								<span id="pageNumbers" class="px-2 text-gray-600"></span>
+								<button id="nextPage" class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+									Next →
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</section>
+		</div>
+	</div>
+</div>
+
+<script>
+window.VoiceCallingUI = { currentTab: 'agents' };
+
+VoiceCallingUI.showTab = function(tab) {
+	this.currentTab = tab;
+	document.getElementById('panelAgents').classList.toggle('hidden', tab !== 'agents');
+	document.getElementById('panelHistory').classList.toggle('hidden', tab !== 'history');
+	document.getElementById('panelNotifications').classList.toggle('hidden', tab !== 'notifications');
+	document.getElementById('tabAgents').className = tab === 'agents' ? 'border-indigo-500 text-indigo-600 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium';
+	document.getElementById('tabHistory').className = tab === 'history' ? 'border-indigo-500 text-indigo-600 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium';
+	document.getElementById('tabNotifications').className = tab === 'notifications' ? 'border-indigo-500 text-indigo-600 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 whitespace-nowrap py-2 px-1 border-b-2 text-sm font-medium';
+	
+	// Load data when tabs are shown
+	if (tab === 'history') {
+		VoiceCallingUI.loadHistory();
+	} else if (tab === 'notifications') {
+		VoiceCallingUI.loadNotifications();
+	}
+};
+
+VoiceCallingUI.fetchAgents = function() {
+	return fetch('/api/voice/agents', { credentials: 'include' })
+		.then(r => r.ok ? r.json() : null)
+		.then(agents => {
+			if (!agents) return;
+			const list = document.getElementById('agentsList');
+			if (list) {
+				list.innerHTML = agents.map(a => `
+				<div class="p-3 flex items-center justify-between">
+					<div>
+						<div class="text-sm font-medium text-gray-900">${a.name}</div>
+						<div class="text-xs text-gray-500">Voice: ${a.voice || 'default'} • Lang: ${a.language || 'en-US'}</div>
+					</div>
+					<button class="text-red-600 hover:text-red-700 text-sm" onclick="VoiceCallingUI.deleteAgent('${a.id}')">Delete</button>
+				</div>`).join('');
+			}
+
+		});
+};
+
+// Voice options are now hardcoded in HTML for better control
+
+// Language options are now hardcoded in HTML for better control
+
+// Audio preview management
+VoiceCallingUI.currentAudio = null;
+VoiceCallingUI.activePreviewRequests = new Map();
+
+// Preview voice using direct Polly TTS (exact voice that will be used in calls)
+VoiceCallingUI.previewVoice = async function() {
+	const voice = document.getElementById('agentVoice').value;
+	const language = document.getElementById('agentLanguage').value;
+	
+	if (!voice) {
+		alert('Please select a voice first.');
+		return;
+	}
+	
+	if (!language) {
+		alert('Please select a language first.');
+		return;
+	}
+	
+	const button = document.getElementById('previewVoice');
+	const originalText = button.textContent;
+	
+	// Stop any currently playing audio
+	if (VoiceCallingUI.currentAudio) {
+		VoiceCallingUI.currentAudio.pause();
+		VoiceCallingUI.currentAudio = null;
+	}
+	
+	button.textContent = '🎧 Generating...';
+	button.disabled = true;
+	
+	try {
+		const sampleText = 'Hello! This is exactly how your AI voice agent will sound during campaign calls.';
+		
+		// Request audio generation directly from Polly
+		const response = await fetch('/api/voice/preview-audio', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ voice, language, text: sampleText })
+		});
+		
+		if (!response.ok) {
+			if (response.headers.get('content-type')?.includes('application/json')) {
+				const error = await response.json();
+				throw new Error(error.error || 'Failed to generate preview');
+			} else {
+				throw new Error('Failed to generate preview audio');
+			}
+		}
+		
+		// Response is MP3 audio data
+		const audioBlob = await response.blob();
+		const audioUrl = URL.createObjectURL(audioBlob);
+		
+		button.textContent = '🎵 Playing...';
+		
+		// Play the generated audio
+		VoiceCallingUI.currentAudio = new Audio(audioUrl);
+		VoiceCallingUI.currentAudio.onended = () => {
+			button.textContent = originalText;
+			button.disabled = false;
+			VoiceCallingUI.currentAudio = null;
+			// Clean up blob URL
+			URL.revokeObjectURL(audioUrl);
+		};
+		VoiceCallingUI.currentAudio.onerror = (error) => {
+			console.error('Audio playback error:', error);
+			button.textContent = originalText;
+			button.disabled = false;
+			VoiceCallingUI.currentAudio = null;
+			URL.revokeObjectURL(audioUrl);
+			alert('Audio playback failed. Please try again.');
+		};
+		
+		VoiceCallingUI.currentAudio.play();
+		
+	} catch (error) {
+		console.error('Voice preview error:', error);
+		button.textContent = originalText;
+		button.disabled = false;
+		alert('Voice preview failed: ' + error.message);
+	}
+};
+
+VoiceCallingUI.loadContacts = function() {
+	const search = (document.getElementById('contactSearch').value || '').trim();
+	const category = document.getElementById('contactCategory').value || '';
+	
+	return fetch('/api/contacts', { credentials: 'include' })
+		.then(res => res.ok ? res.json() : [])
+		.then(contacts => {
+			// Update categories dropdown
+			const categories = [...new Set((contacts || []).map(c => c.category).filter(Boolean))].sort();
+			const catSelect = document.getElementById('contactCategory');
+			if (catSelect && catSelect.options.length <= 1) {
+				catSelect.innerHTML = '<option value="">All Categories</option>' + categories.map(c => `<option value="${c}">${c}</option>`).join('');
+			}
+			
+			// Filter contacts
+			let filtered = contacts || [];
+			if (category) filtered = filtered.filter(c => (c.category || '') === category);
+			if (search) {
+				const q = search.toLowerCase();
+				filtered = filtered.filter(c => 
+					(c.firstName||'').toLowerCase().includes(q) || 
+					(c.lastName||'').toLowerCase().includes(q) || 
+					(c.email||'').toLowerCase().includes(q) || 
+					(c.city||'').toLowerCase().includes(q) || 
+					(c.phone||'').toLowerCase().includes(q)
+				);
+			}
+			
+			// Only show contacts with valid phone numbers
+			const callableContacts = filtered.filter(c => c.phone && c.phone.trim());
+			
+			// Update summary
+			const summary = document.getElementById('contactsSummary');
+			const countSpan = document.getElementById('contactsCount');
+			const selectedSpan = document.getElementById('selectedCount');
+			
+			if (callableContacts.length > 0) {
+				summary.classList.remove('hidden');
+				countSpan.textContent = `${callableContacts.length} contacts loaded`;
+				VoiceCallingUI.updateSelectedCount();
+			} else {
+				summary.classList.add('hidden');
+			}
+			
+			// Render contacts list
+			const list = document.getElementById('contactsList');
+			if (callableContacts.length === 0) {
+				list.innerHTML = `
+					<div class="p-8 text-center text-gray-500">
+						<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+						</svg>
+						<p class="font-medium">No contacts found</p>
+						<p class="text-xs mt-1">
+							${filtered.length > 0 ? 
+								'Found contacts but they have no phone numbers. ' : 
+								search || category ? 'Try adjusting your search or category filter. ' : 'No contacts available. '
+							}
+							<a href="/contact-manager" class="text-indigo-600 underline">Add contacts</a>
+						</p>
+					</div>
+				`;
+			} else {
+				// Pagination setup
+				VoiceCallingUI.currentContacts = callableContacts;
+				VoiceCallingUI.currentPage = VoiceCallingUI.currentPage || 1;
+				VoiceCallingUI.contactsPerPage = 25;
+				
+				const totalPages = Math.ceil(callableContacts.length / VoiceCallingUI.contactsPerPage);
+				const startIndex = (VoiceCallingUI.currentPage - 1) * VoiceCallingUI.contactsPerPage;
+				const endIndex = startIndex + VoiceCallingUI.contactsPerPage;
+				const paginatedContacts = callableContacts.slice(startIndex, endIndex);
+				
+				list.innerHTML = paginatedContacts.map(c => `
+					<label class="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer">
+						<div class="flex-1 min-w-0">
+							<div class="text-sm font-medium text-gray-900 truncate">
+								${(c.lastName||'').trim()}, ${(c.firstName||'').trim()}
+							</div>
+							<div class="text-xs text-gray-500 truncate">
+								${c.email || ''} ${c.email && c.phone ? '•' : ''} ${c.phone || ''}
+							</div>
+							${c.category ? `<div class="text-xs text-indigo-600">${c.category}</div>` : ''}
+						</div>
+						<input type="checkbox" value="${c.id}" class="contact-pick ml-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" onchange="VoiceCallingUI.updateSelectedCount()" />
+					</label>
+				`).join('');
+				
+				// Add pagination controls if needed
+				if (totalPages > 1) {
+					list.innerHTML += `
+						<div class="p-3 bg-gray-50 border-t">
+							<div class="flex items-center justify-between text-sm">
+								<div class="text-gray-600">
+									Showing ${startIndex + 1}-${Math.min(endIndex, callableContacts.length)} of ${callableContacts.length} contacts
+								</div>
+								<div class="flex items-center space-x-2">
+									<button ${VoiceCallingUI.currentPage === 1 ? 'disabled' : ''} 
+											onclick="VoiceCallingUI.changePage(${VoiceCallingUI.currentPage - 1})" 
+											class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+										← Previous
+									</button>
+									<span class="px-2 text-gray-600">
+										${VoiceCallingUI.currentPage} / ${totalPages}
+									</span>
+									<button ${VoiceCallingUI.currentPage === totalPages ? 'disabled' : ''} 
+											onclick="VoiceCallingUI.changePage(${VoiceCallingUI.currentPage + 1})" 
+											class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+										Next →
+									</button>
+								</div>
+							</div>
+						</div>
+					`;
+				}
+			}
+		})
+		.catch(e => {
+			const list = document.getElementById('contactsList');
+			list.innerHTML = `
+				<div class="p-8 text-center text-red-500">
+					<p>Error loading contacts</p>
+					<p class="text-xs mt-1">Please refresh and try again</p>
+				</div>
+			`;
+		});
+};
+
+VoiceCallingUI.selectAllContacts = function() {
+	const checkboxes = document.querySelectorAll('.contact-pick');
+	const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+	
+	checkboxes.forEach(cb => {
+		cb.checked = !allChecked;
+	});
+	
+	VoiceCallingUI.updateSelectedCount();
+};
+
+VoiceCallingUI.updateSelectedCount = function() {
+	const selected = Array.from(document.querySelectorAll('.contact-pick:checked'));
+	const selectedSpan = document.getElementById('selectedCount');
+	if (selectedSpan) {
+		selectedSpan.textContent = `${selected.length} selected`;
+		
+		// Update select all button text
+		const selectAllBtn = document.querySelector('button[onclick="VoiceCallingUI.selectAllContacts()"]');
+		if (selectAllBtn) {
+			const checkboxes = document.querySelectorAll('.contact-pick');
+			const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+			selectAllBtn.innerHTML = allChecked ? '☐ Unselect All' : '☑️ Select All';
+		}
+	}
+};
+
+VoiceCallingUI.changePage = function(newPage) {
+	VoiceCallingUI.currentPage = newPage;
+	VoiceCallingUI.renderCurrentPage();
+};
+
+VoiceCallingUI.renderCurrentPage = function() {
+	if (!VoiceCallingUI.currentContacts) return;
+	
+	const callableContacts = VoiceCallingUI.currentContacts;
+	const totalPages = Math.ceil(callableContacts.length / VoiceCallingUI.contactsPerPage);
+	const startIndex = (VoiceCallingUI.currentPage - 1) * VoiceCallingUI.contactsPerPage;
+	const endIndex = startIndex + VoiceCallingUI.contactsPerPage;
+	const paginatedContacts = callableContacts.slice(startIndex, endIndex);
+	
+	const list = document.getElementById('contactsList');
+	list.innerHTML = paginatedContacts.map(c => `
+		<label class="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer">
+			<div class="flex-1 min-w-0">
+				<div class="text-sm font-medium text-gray-900 truncate">
+					${(c.lastName||'').trim()}, ${(c.firstName||'').trim()}
+				</div>
+				<div class="text-xs text-gray-500 truncate">
+					${c.email || ''} ${c.email && c.phone ? '•' : ''} ${c.phone || ''}
+				</div>
+				${c.category ? `<div class="text-xs text-indigo-600">${c.category}</div>` : ''}
+			</div>
+			<input type="checkbox" value="${c.id}" class="contact-pick ml-3 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" onchange="VoiceCallingUI.updateSelectedCount()" />
+		</label>
+	`).join('');
+	
+	// Add pagination controls if needed
+	if (totalPages > 1) {
+		list.innerHTML += `
+			<div class="p-3 bg-gray-50 border-t">
+				<div class="flex items-center justify-between text-sm">
+					<div class="text-gray-600">
+						Showing ${startIndex + 1}-${Math.min(endIndex, callableContacts.length)} of ${callableContacts.length} contacts
+					</div>
+					<div class="flex items-center space-x-2">
+						<button ${VoiceCallingUI.currentPage === 1 ? 'disabled' : ''} 
+								onclick="VoiceCallingUI.changePage(${VoiceCallingUI.currentPage - 1})" 
+								class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+							← Previous
+						</button>
+						<span class="px-2 text-gray-600">
+							${VoiceCallingUI.currentPage} / ${totalPages}
+						</span>
+						<button ${VoiceCallingUI.currentPage === totalPages ? 'disabled' : ''} 
+								onclick="VoiceCallingUI.changePage(${VoiceCallingUI.currentPage + 1})" 
+								class="px-3 py-1 border rounded text-sm hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
+							Next →
+						</button>
+					</div>
+				</div>
+			</div>
+		`;
+	}
+	
+	VoiceCallingUI.updateSelectedCount();
+};
+
+// Preview campaign audio using direct Polly TTS (exact voice that will be used in calls)
+VoiceCallingUI.previewCampaignAudio = async function() {
+	const voice = document.getElementById('agentVoice').value;
+	const language = document.getElementById('agentLanguage').value;
+	const prompt = document.getElementById('agentPrompt').value.trim();
+	
+	if (!voice) {
+		alert('Please select a voice first.');
+		return;
+	}
+	
+	if (!language) {
+		alert('Please select a language first.');
+		return;
+	}
+	
+	if (!prompt) {
+		alert('Please enter your campaign message first.');
+		return;
+	}
+	
+	const button = document.getElementById('previewCampaignAudio');
+	const originalText = button.textContent;
+	
+	// Stop any currently playing audio
+	if (VoiceCallingUI.currentAudio) {
+		VoiceCallingUI.currentAudio.pause();
+		VoiceCallingUI.currentAudio = null;
+	}
+	
+	button.textContent = '🎧 Generating...';
+	button.disabled = true;
+	
+	try {
+		// Request audio generation directly from Polly
+		const response = await fetch('/api/voice/campaign-preview', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			credentials: 'include',
+			body: JSON.stringify({ voice, language, prompt })
+		});
+		
+		if (!response.ok) {
+			if (response.headers.get('content-type')?.includes('application/json')) {
+				const error = await response.json();
+				throw new Error(error.error || 'Failed to generate campaign preview');
+			} else {
+				throw new Error('Failed to generate campaign preview audio');
+			}
+		}
+		
+		// Response is MP3 audio data
+		const audioBlob = await response.blob();
+		const audioUrl = URL.createObjectURL(audioBlob);
+		
+		button.textContent = '🎵 Playing...';
+		
+		// Play the generated audio
+		VoiceCallingUI.currentAudio = new Audio(audioUrl);
+		VoiceCallingUI.currentAudio.onended = () => {
+			button.textContent = originalText;
+			button.disabled = false;
+			VoiceCallingUI.currentAudio = null;
+			// Clean up blob URL
+			URL.revokeObjectURL(audioUrl);
+		};
+		VoiceCallingUI.currentAudio.onerror = (error) => {
+			console.error('Campaign audio playback error:', error);
+			button.textContent = originalText;
+			button.disabled = false;
+			VoiceCallingUI.currentAudio = null;
+			URL.revokeObjectURL(audioUrl);
+			alert('Audio playback failed. Please try again.');
+		};
+		
+		VoiceCallingUI.currentAudio.play();
+		
+	} catch (error) {
+		console.error('Campaign preview error:', error);
+		button.textContent = originalText;
+		button.disabled = false;
+		alert('Campaign preview failed: ' + error.message);
+	}
+};
+
+VoiceCallingUI.quickStart = function() {
+	const voice = document.getElementById('agentVoice').value;
+	const language = document.getElementById('agentLanguage').value;
+	const campaignName = document.getElementById('campaignName').value.trim();
+	const message = document.getElementById('agentPrompt').value.trim();
+	
+	if (!voice) {
+		alert('Please select a voice.');
+		return;
+	}
+	
+	if (!language) {
+		alert('Please select a language.');
+		return;
+	}
+	
+	if (!campaignName) {
+		alert('Please enter a campaign name.');
+		return;
+	}
+	
+	if (!message) {
+		alert('Please enter your campaign message.');
+		return;
+	}
+	
+	const selected = Array.from(document.querySelectorAll('.contact-pick:checked')).map(el => el.value);
+	if (selected.length === 0) {
+		alert('Please select at least one contact to call.');
+		return;
+	}
+	
+	// Show confirmation modal
+	VoiceCallingUI.showConfirmationModal(voice, language, campaignName, message, selected);
+};
+
+VoiceCallingUI.showConfirmationModal = function(voice, language, campaignName, message, contactIds) {
+	// Get voice and language display names
+	const voiceSelect = document.getElementById('agentVoice');
+	const languageSelect = document.getElementById('agentLanguage');
+	const voiceText = voiceSelect.options[voiceSelect.selectedIndex].text;
+	const languageText = languageSelect.options[languageSelect.selectedIndex].text;
+	
+	// Create modal HTML
+	const modalHtml = `
+		<div id="campaignConfirmModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+			<div class="relative top-20 mx-auto p-5 border w-11/12 md:w-1/2 shadow-lg rounded-md bg-white">
+				<div class="mt-3">
+					<h3 class="text-lg font-medium text-gray-900 mb-4">Confirm AI Voice Campaign</h3>
+					
+					<div class="space-y-3 mb-6">
+						<div>
+							<span class="font-medium text-gray-700">Campaign Name:</span>
+							<span class="ml-2 text-gray-900">${campaignName}</span>
+						</div>
+						<div>
+							<span class="font-medium text-gray-700">Voice:</span>
+							<span class="ml-2 text-gray-900">${voiceText}</span>
+						</div>
+						<div>
+							<span class="font-medium text-gray-700">Language:</span>
+							<span class="ml-2 text-gray-900">${languageText}</span>
+						</div>
+						<div>
+							<span class="font-medium text-gray-700">Message:</span>
+							<div class="mt-1 p-3 bg-gray-50 border rounded text-sm text-gray-900">${message}</div>
+						</div>
+						<div>
+							<span class="font-medium text-gray-700">Contacts:</span>
+							<span class="ml-2 text-gray-900">${contactIds.length} contact${contactIds.length !== 1 ? 's' : ''} selected</span>
+						</div>
+						<div>
+							<span class="font-medium text-gray-700">Cost:</span>
+							<span class="ml-2 text-gray-900">${contactIds.length} AI Call Token${contactIds.length !== 1 ? 's' : ''}</span>
+						</div>
+					</div>
+					
+					<div class="flex items-center justify-end space-x-3">
+						<button id="cancelCampaign" class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Cancel</button>
+						<button id="startCampaign" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Start Campaign</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	`;
+	
+	// Add modal to page
+	document.body.insertAdjacentHTML('beforeend', modalHtml);
+	
+	// Add event listeners
+	document.getElementById('cancelCampaign').onclick = function() {
+		document.getElementById('campaignConfirmModal').remove();
+	};
+	
+	document.getElementById('startCampaign').onclick = function() {
+		document.getElementById('campaignConfirmModal').remove();
+		VoiceCallingUI.startCampaign(voice, language, campaignName, message, contactIds);
+	};
+};
+
+VoiceCallingUI.startCampaign = function(voice, language, campaignName, message, contactIds) {
+	
+	const button = document.querySelector('button[onclick="VoiceCallingUI.quickStart()"]');
+	const originalText = button.textContent;
+	button.textContent = '🚀 Starting Campaign...';
+	button.disabled = true;
+	
+	fetch('/api/campaigns/start', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		credentials: 'include',
+		body: JSON.stringify({ voice, language, campaignName, message, contactIds })
+	})
+	.then(response => {
+		if (!response.ok) {
+			return response.json().then(err => { throw err; });
+		}
+		return response.json();
+	})
+	.then(result => {
+		
+		// Show success message
+		alert(`Campaign started successfully!\n\n${result.successfulCalls} calls queued\n${result.failedCalls} calls failed\n\nView responses in the Responses tab or check analytics on the Dashboard.`);
+		
+		button.textContent = originalText;
+		button.disabled = false;
+	})
+	.catch(error => {
+		console.error('Campaign start error:', error);
+		alert('Failed to start campaign: ' + (error.error || error.message || 'Unknown error'));
+		button.textContent = originalText;
+		button.disabled = false;
+	});
+};
+
+VoiceCallingUI.monitorCampaign = function(campaignId) {
+	
+	const updateStatus = () => {
+		fetch(`/api/campaigns/status/${campaignId}`, { credentials: 'include' })
+			.then(response => response.ok ? response.json() : null)
+			.then(data => {
+				if (data) {
+					VoiceCallingUI.updateMonitorDisplay(data);
+					
+					// Continue polling if campaign is still running
+					if (data.campaign.status === 'running') {
+						setTimeout(updateStatus, 5000);
+					}
+				}
+			})
+			.catch(error => {
+				console.error('Campaign status error:', error);
+			});
+	};
+	
+	// Start polling
+	updateStatus();
+};
+
+VoiceCallingUI.updateMonitorDisplay = function(data) {
+	// Update active calls display
+	const activeCalls = data.calls.filter(call => call.status === 'initiated' || call.status === 'ringing' || call.status === 'in-progress');
+	const recentCalls = data.calls.filter(call => call.status !== 'initiated' && call.status !== 'ringing' && call.status !== 'in-progress').slice(-10);
+	
+	const activeDiv = document.getElementById('activeCalls');
+	const recentDiv = document.getElementById('recentCalls');
+	
+	if (activeCalls.length > 0) {
+		activeDiv.innerHTML = activeCalls.map(call => `
+			<div class="p-3 border-b last:border-b-0">
+				<div class="text-sm font-medium">${call.contactName || 'Unknown'}</div>
+				<div class="text-xs text-gray-500">${call.phone} • Status: ${call.status}</div>
+				<div class="text-xs text-gray-400">Started: ${new Date(call.startedAt).toLocaleTimeString()}</div>
+			</div>
+		`).join('');
+	} else {
+		activeDiv.innerHTML = '<div class="p-4 text-center text-gray-500"><p class="text-sm">No active calls</p></div>';
+	}
+	
+	if (recentCalls.length > 0) {
+		recentDiv.innerHTML = recentCalls.map(call => `
+			<div class="p-3 border-b last:border-b-0">
+				<div class="text-sm font-medium">${call.contactName || 'Unknown'}</div>
+				<div class="text-xs text-gray-500">${call.phone} • ${call.status}</div>
+				${call.response ? `<div class="text-xs text-green-600">Response: ${call.response}</div>` : ''}
+				<div class="text-xs text-gray-400">${new Date(call.startedAt).toLocaleTimeString()}</div>
+			</div>
+		`).join('');
+	} else {
+		recentDiv.innerHTML = '<div class="p-4 text-center text-gray-500"><p class="text-sm">No recent calls</p></div>';
+	}
+	
+	// Update page title with campaign status
+	if (data.campaign) {
+		document.title = `Campaign Builder - ${data.stats.completedCalls}/${data.stats.totalCalls} calls completed`;
+	}
+};
+
+VoiceCallingUI.saveAgent = function() {
+	const payload = {
+		name: document.getElementById('agentName').value.trim(),
+		systemPrompt: document.getElementById('agentSystemPrompt').value.trim(),
+		greeting: document.getElementById('agentGreeting').value.trim(),
+		voice: document.getElementById('agentVoice').value.trim(),
+		language: document.getElementById('agentLanguage').value.trim(),
+		maxTurns: Number(document.getElementById('agentMaxTurns').value || 6),
+		endPhrases: document.getElementById('agentEndPhrases').value.split(',').map(s => s.trim()).filter(Boolean),
+		transferNumber: document.getElementById('agentTransferNumber').value.trim() || null
+	};
+	return fetch('/api/voice/agents', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify(payload) })
+		.then(r => {
+			if (r.ok) {
+				return VoiceCallingUI.fetchAgents().then(() => {
+					['agentName','agentSystemPrompt','agentGreeting','agentVoice','agentLanguage','agentMaxTurns','agentEndPhrases','agentTransferNumber'].forEach(id => {
+						const el = document.getElementById(id);
+						if (el) el.value = '';
+					});
+				});
+			}
+		});
+};
+
+VoiceCallingUI.deleteAgent = function(id) {
+	return fetch(`/api/voice/agents/${id}`, { method: 'DELETE', credentials: 'include' })
+		.then(() => VoiceCallingUI.fetchAgents());
+};
+
+VoiceCallingUI.renderCall = function(c) {
+	return `<div class="p-3">
+		<div class="text-sm font-medium text-gray-900">${c.contactId || c.to}</div>
+		<div class="text-xs text-gray-500">Status: ${c.status || ''} • Duration: ${c.durationSec || 0}s • Outcome: ${c.outcome || ''}</div>
+	</div>`;
+};
+
+VoiceCallingUI.refreshMonitor = function() {
+	return fetch('/api/voice/monitor', { credentials: 'include' })
+		.then(r => r.ok ? r.json() : { active: [], recent: [] })
+		.then(data => {
+			const activeDiv = document.getElementById('activeCalls');
+			const recentDiv = document.getElementById('recentCalls');
+			
+			// Only update if elements exist (they may not exist on this page)
+			if (activeDiv) {
+				if (data.active && data.active.length > 0) {
+					activeDiv.innerHTML = data.active.map(VoiceCallingUI.renderCall).join('');
+				} else {
+					activeDiv.innerHTML = '<div class="p-4 text-center text-gray-500"><p class="text-sm">No active calls</p></div>';
+				}
+			}
+			
+			if (recentDiv) {
+				if (data.recent && data.recent.length > 0) {
+					recentDiv.innerHTML = data.recent.map(VoiceCallingUI.renderCall).join('');
+				} else {
+					recentDiv.innerHTML = '<div class="p-4 text-center text-gray-500"><p class="text-sm">No recent calls</p></div>';
+				}
+			}
+		});
+};
+
+VoiceCallingUI.searchContactCalls = function() {
+	const searchTerm = document.getElementById('contactSearchInput').value.trim();
+	if (!searchTerm) {
+		alert('Please enter a contact name, email, or phone number to search.');
+		return;
+	}
+	
+	const resultsDiv = document.getElementById('contactSearchResults');
+	resultsDiv.innerHTML = '<div class="p-4 text-center"><div class="animate-spin h-6 w-6 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto"></div><p class="text-sm text-gray-600 mt-2">Searching...</p></div>';
+	
+	return fetch(`/api/voice/search-contact-calls?query=${encodeURIComponent(searchTerm)}`, { credentials: 'include' })
+		.then(r => r.ok ? r.json() : { contact: null, calls: [] })
+		.then(data => {
+			if (!data.contact) {
+				resultsDiv.innerHTML = `
+					<div class="p-4 text-center text-gray-500">
+						<svg class="mx-auto h-8 w-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.02-5.5-2.5"></path>
+						</svg>
+						<p class="text-sm">No contact found matching "${searchTerm}"</p>
+						<p class="text-xs text-gray-400 mt-1">Try searching by name, email, or phone number</p>
+					</div>
+				`;
+				return;
+			}
+			
+			const contact = data.contact;
+			const calls = data.calls || [];
+			
+			let callsHtml = '';
+			if (calls.length > 0) {
+				callsHtml = calls.map(call => `
+					<div class="p-3 border-b last:border-b-0 flex justify-between items-center">
+						<div>
+							<div class="text-sm font-medium">${new Date(call.startedAt).toLocaleString()}</div>
+							<div class="text-xs text-gray-500">Campaign: ${call.campaignName || 'Unknown'}</div>
+							${call.endedAt ? `<div class="text-xs text-gray-500">Duration: ${VoiceCallingUI.calculateDuration(call.startedAt, call.endedAt)}</div>` : ''}
+						</div>
+						<div class="text-right">
+							<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${VoiceCallingUI.getStatusColor(call.status)}">
+								${call.status}
+							</span>
+							${call.outcome ? `<div class="text-xs text-gray-500 mt-1">${call.outcome}</div>` : ''}
+						</div>
+					</div>
+				`).join('');
+			} else {
+				callsHtml = '<div class="p-4 text-center text-gray-500"><p class="text-sm">No AI calls found for this contact</p></div>';
+			}
+			
+			resultsDiv.innerHTML = `
+				<div class="p-4 border-b bg-blue-50">
+					<div class="flex items-center space-x-3">
+						<div class="bg-blue-100 rounded-full p-2">
+							<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+							</svg>
+						</div>
+						<div>
+							<div class="font-medium text-gray-900">${contact.firstName} ${contact.lastName}</div>
+							<div class="text-sm text-gray-600">${contact.email || ''} ${contact.email && contact.phone ? '•' : ''} ${contact.phone || ''}</div>
+							${contact.category ? `<div class="text-xs text-blue-600">${contact.category}</div>` : ''}
+						</div>
+					</div>
+				</div>
+				<div class="bg-white">
+					<div class="p-3 border-b bg-gray-50">
+						<h4 class="text-sm font-medium text-gray-900">AI Call History (${calls.length} call${calls.length !== 1 ? 's' : ''})</h4>
+					</div>
+					${callsHtml}
+				</div>
+			`;
+		})
+		.catch(error => {
+			console.error('Search error:', error);
+			resultsDiv.innerHTML = `
+				<div class="p-4 text-center text-red-500">
+					<p class="text-sm">Error searching for contact calls</p>
+					<p class="text-xs mt-1">Please try again</p>
+				</div>
+			`;
+		});
+};
+
+VoiceCallingUI.getStatusColor = function(status) {
+	const statusColors = {
+		'initiated': 'bg-blue-100 text-blue-800',
+		'ringing': 'bg-yellow-100 text-yellow-800',
+		'in-progress': 'bg-green-100 text-green-800',
+		'completed': 'bg-gray-100 text-gray-800',
+		'failed': 'bg-red-100 text-red-800',
+		'busy': 'bg-orange-100 text-orange-800',
+		'no-answer': 'bg-gray-100 text-gray-800'
+	};
+	return statusColors[status] || 'bg-gray-100 text-gray-800';
+};
+
+VoiceCallingUI.calculateDuration = function(startTime, endTime) {
+	const start = new Date(startTime);
+	const end = new Date(endTime);
+	const durationMs = end - start;
+	const durationSec = Math.floor(durationMs / 1000);
+	const minutes = Math.floor(durationSec / 60);
+	const seconds = durationSec % 60;
+	return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+};
+
+VoiceCallingUI.testTwilioAccount = function() {
+	const statusDiv = document.getElementById('twilioAccountStatus');
+	statusDiv.classList.remove('hidden');
+	statusDiv.innerHTML = `
+		<div class="animate-spin h-4 w-4 border-2 border-indigo-600 border-t-transparent rounded-full mx-auto"></div>
+		<p class="text-center mt-2">Checking Twilio account status...</p>
+	`;
+	
+	return fetch('/api/voice/test-account', { credentials: 'include' })
+		.then(response => {
+			if (!response.ok) {
+				return response.json().then(err => { throw err; });
+			}
+			return response.json();
+		})
+		.then(data => {
+			
+			let statusHtml = `
+				<div class="space-y-3">
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div>
+							<h4 class="font-medium text-gray-900 mb-2">Account Info</h4>
+							<div class="text-xs space-y-1">
+								<div><span class="font-medium">Name:</span> ${data.account.friendlyName || 'N/A'}</div>
+								<div><span class="font-medium">Status:</span> <span class="px-2 py-1 rounded text-xs ${data.account.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${data.account.status}</span></div>
+								<div><span class="font-medium">Type:</span> ${data.account.type || 'N/A'}</div>
+							</div>
+						</div>
+						<div>
+							<h4 class="font-medium text-gray-900 mb-2">Calling Capability</h4>
+							<div class="text-xs space-y-1">
+								<div><span class="font-medium">Voice Calls:</span> <span class="px-2 py-1 rounded text-xs ${data.capabilities.canMakeVoiceCalls ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">${data.capabilities.canMakeVoiceCalls ? 'Enabled' : 'Disabled'}</span></div>
+								<div><span class="font-medium">Phone Numbers:</span> ${data.capabilities.hasPhoneNumbers ? data.ownedNumbers.length + ' owned' : 'None owned'}</div>
+							</div>
+						</div>
+					</div>
+					
+					<div>
+						<h4 class="font-medium text-gray-900 mb-2">Verified Numbers (${data.verifiedCallerIds.length})</h4>
+						<div class="text-xs space-y-1 max-h-20 overflow-y-auto">
+							${data.verifiedCallerIds.length > 0 ? 
+								data.verifiedCallerIds.map(n => `<div class="bg-green-50 p-1 rounded">${n.phoneNumber} ${n.friendlyName ? '(' + n.friendlyName + ')' : ''}</div>`).join('') :
+								'<div class="text-gray-500">No verified caller IDs found</div>'
+							}
+						</div>
+					</div>
+					
+					${data.ownedNumbers.length > 0 ? `
+					<div>
+						<h4 class="font-medium text-gray-900 mb-2">Owned Numbers (${data.ownedNumbers.length})</h4>
+						<div class="text-xs space-y-1 max-h-20 overflow-y-auto">
+							${data.ownedNumbers.map(n => `<div class="bg-blue-50 p-1 rounded">${n.phoneNumber} ${n.friendlyName ? '(' + n.friendlyName + ')' : ''}</div>`).join('')}
+						</div>
+					</div>
+					` : ''}
+				</div>
+			`;
+			
+			statusDiv.innerHTML = statusHtml;
+		})
+		.catch(error => {
+			console.error('Twilio test error:', error);
+			statusDiv.innerHTML = `
+				<div class="text-red-600">
+					<h4 class="font-medium mb-2">❌ Test Failed</h4>
+					<div class="text-xs">
+						<p><strong>Error:</strong> ${error.error || error.message || 'Unknown error'}</p>
+						${error.code ? `<p><strong>Code:</strong> ${error.code}</p>` : ''}
+						<p class="mt-2 text-gray-600">This might indicate a Twilio API authentication issue or account restriction.</p>
+					</div>
+				</div>
+			`;
+		});
+};
+
+// Phone number formatting function
+VoiceCallingUI.formatPhoneNumber = function(value) {
+	// Remove all non-digit characters
+	const digits = value.replace(/\D/g, '');
+	
+	// Format based on length
+	if (digits.length >= 11 && digits.startsWith('1')) {
+		// US/Canada format with country code: +1 (555) 123-4567
+		const match = digits.match(/^1(\d{3})(\d{3})(\d{4})$/);
+		if (match) {
+			return `+1 (${match[1]}) ${match[2]}-${match[3]}`;
+		}
+	} else if (digits.length === 10) {
+		// US/Canada format without country code: (555) 123-4567
+		const match = digits.match(/^(\d{3})(\d{3})(\d{4})$/);
+		if (match) {
+			return `+1 (${match[1]}) ${match[2]}-${match[3]}`;
+		}
+	}
+	
+	// If doesn't match standard format, just add + if it doesn't start with one
+	return digits.length > 0 && !value.startsWith('+') ? '+' + digits : value;
+};
+
+// Notifications functionality
+VoiceCallingUI.notifications = {
+	currentPage: 1,
+	itemsPerPage: 25,
+	totalItems: 0,
+	allNotifications: [],
+	filteredNotifications: []
+};
+
+VoiceCallingUI.loadNotifications = function(page = 1, search = '', startDate = '', endDate = '') {
+	const params = new URLSearchParams({
+		page: page,
+		limit: this.notifications.itemsPerPage,
+		search: search,
+		startDate: startDate,
+		endDate: endDate
+	});
+	
+	return fetch(`/api/voice/notifications?${params}`, { credentials: 'include' })
+		.then(response => response.ok ? response.json() : { notifications: [], pagination: {} })
+		.then(data => {
+			this.notifications.allNotifications = data.notifications || [];
+			this.notifications.currentPage = data.pagination.currentPage || 1;
+			this.notifications.totalItems = data.pagination.totalItems || 0;
+			
+			this.renderNotifications(data.notifications);
+			this.renderPagination(data.pagination);
+			this.updateNotificationCount(data.pagination.totalItems, search);
+		})
+		.catch(error => {
+			console.error('Load notifications error:', error);
+			this.renderNotifications([]);
+		});
+};
+
+VoiceCallingUI.renderNotifications = function(notifications) {
+	const container = document.getElementById('notificationsList');
+	
+	if (!notifications || notifications.length === 0) {
+		container.innerHTML = `
+			<div class="p-8 text-center text-gray-500">
+				<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+				</svg>
+				<p>No contact responses found</p>
+				<p class="text-xs mt-1">Contact responses from AI calls will appear here</p>
+			</div>
+		`;
+		return;
+	}
+	
+	container.innerHTML = notifications.map(notification => {
+		const startDate = new Date(notification.startedAt).toLocaleString();
+		const duration = notification.endedAt ? 
+			VoiceCallingUI.calculateDuration(notification.startedAt, notification.endedAt) : 
+			'In progress';
+		
+		const statusColor = VoiceCallingUI.getStatusColor(notification.status);
+		
+		let transcriptHtml = '';
+		if (notification.transcript && notification.transcript.length > 0) {
+			transcriptHtml = `
+				<div class="mt-3 p-3 bg-gray-50 rounded">
+					<h5 class="text-xs font-medium text-gray-900 mb-2">Conversation:</h5>
+					<div class="text-xs space-y-1 max-h-32 overflow-y-auto">
+						${notification.transcript.map(turn => `
+							<div class="${turn.role === 'assistant' ? 'text-blue-600' : 'text-green-600'}">
+								<strong>${turn.role === 'assistant' ? 'AI:' : 'Contact:'}</strong> ${turn.text}
+							</div>
+						`).join('')}
+					</div>
+				</div>
+			`;
+		}
+		
+		// Extract the contact's response from transcript
+		let contactResponse = '';
+		if (notification.transcript && notification.transcript.length > 0) {
+			const userTurns = notification.transcript.filter(turn => turn.role === 'user');
+			if (userTurns.length > 0) {
+				contactResponse = userTurns[userTurns.length - 1].text; // Get last response
+			}
+		}
+		
+		// If no transcript response, check for recorded response
+		if (!contactResponse && notification.response) {
+			contactResponse = notification.response;
+		}
+		
+		return `
+			<div class="p-4 hover:bg-gray-50 border-l-4 border-indigo-400">
+				<div class="flex items-start justify-between">
+					<div class="flex-1">
+						<div class="flex items-center space-x-3 mb-2">
+							<div class="bg-indigo-100 rounded-full p-2">
+								<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+								</svg>
+							</div>
+							<div>
+								<div class="font-medium text-gray-900">${notification.contactName || 'Unknown Contact'}</div>
+								<div class="text-xs text-gray-500">
+									Campaign: <span class="font-medium">${notification.campaignName || 'Unknown'}</span>
+								</div>
+							</div>
+						</div>
+						
+						${contactResponse ? `
+							<div class="ml-11 space-y-3">
+								<div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+									<div class="text-sm font-medium text-blue-800 mb-1">Campaign Message:</div>
+									<div class="text-sm text-blue-700">"${notification.campaignMessage || 'Message not available'}"</div>
+								</div>
+								<div class="p-3 bg-green-50 border border-green-200 rounded-lg">
+									<div class="text-sm font-medium text-green-800 mb-1">Contact Response:</div>
+									<div class="text-sm text-green-700">"${contactResponse}"</div>
+								</div>
+							</div>
+						` : `
+							<div class="ml-11 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+								<div class="text-sm text-gray-600">Call completed - No recorded response</div>
+							</div>
+						`}
+					</div>
+					<div class="text-right ml-4">
+						<div class="text-xs text-gray-500">${startDate}</div>
+					</div>
+				</div>
+				${transcriptHtml}
+			</div>
+		`;
+	}).join('');
+};
+
+VoiceCallingUI.renderPagination = function(pagination) {
+	const paginationContainer = document.getElementById('notificationsPagination');
+	const paginationInfo = document.getElementById('paginationInfo');
+	const prevButton = document.getElementById('prevPage');
+	const nextButton = document.getElementById('nextPage');
+	const pageNumbers = document.getElementById('pageNumbers');
+	
+	if (!pagination || pagination.totalItems === 0) {
+		paginationContainer.classList.add('hidden');
+		return;
+	}
+	
+	paginationContainer.classList.remove('hidden');
+	
+	// Update pagination info
+	paginationInfo.textContent = `Showing ${pagination.startIndex}-${pagination.endIndex} of ${pagination.totalItems} responses`;
+	
+	// Update page numbers
+	pageNumbers.textContent = `${pagination.currentPage} / ${pagination.totalPages}`;
+	
+	// Update button states
+	prevButton.disabled = pagination.currentPage === 1;
+	nextButton.disabled = pagination.currentPage === pagination.totalPages;
+	
+	// Add click handlers
+	prevButton.onclick = () => {
+		if (pagination.currentPage > 1) {
+			const searchInput = document.getElementById('notificationSearchInput');
+			const startDateInput = document.getElementById('notificationStartDate');
+			const endDateInput = document.getElementById('notificationEndDate');
+			VoiceCallingUI.loadNotifications(pagination.currentPage - 1, searchInput.value, startDateInput.value, endDateInput.value);
+		}
+	};
+	
+	nextButton.onclick = () => {
+		if (pagination.currentPage < pagination.totalPages) {
+			const searchInput = document.getElementById('notificationSearchInput');
+			const startDateInput = document.getElementById('notificationStartDate');
+			const endDateInput = document.getElementById('notificationEndDate');
+			VoiceCallingUI.loadNotifications(pagination.currentPage + 1, searchInput.value, startDateInput.value, endDateInput.value);
+		}
+	};
+};
+
+VoiceCallingUI.updateNotificationCount = function(total, search) {
+	const countElement = document.getElementById('notificationCount');
+	const filterElement = document.getElementById('notificationFilter');
+	
+	countElement.textContent = `${total} response${total !== 1 ? 's' : ''}`;
+	
+	if (search && search.trim()) {
+		filterElement.textContent = `Filtered by: "${search}"`;
+		filterElement.classList.remove('hidden');
+	} else {
+		filterElement.classList.add('hidden');
+	}
+};
+
+VoiceCallingUI.searchNotifications = function() {
+	const searchInput = document.getElementById('notificationSearchInput');
+	const startDateInput = document.getElementById('notificationStartDate');
+	const endDateInput = document.getElementById('notificationEndDate');
+	
+	const searchTerm = searchInput.value.trim();
+	const startDate = startDateInput.value;
+	const endDate = endDateInput.value;
+	
+	VoiceCallingUI.loadNotifications(1, searchTerm, startDate, endDate);
+};
+
+// Quick date filter functions
+VoiceCallingUI.applyQuickDateFilter = function() {
+	const quickFilter = document.getElementById('notificationQuickFilter').value;
+	const startDateInput = document.getElementById('notificationStartDate');
+	const endDateInput = document.getElementById('notificationEndDate');
+	
+	const today = new Date();
+	const yesterday = new Date(today);
+	yesterday.setDate(yesterday.getDate() - 1);
+	
+	const last7Days = new Date(today);
+	last7Days.setDate(last7Days.getDate() - 7);
+	
+	const last30Days = new Date(today);
+	last30Days.setDate(last30Days.getDate() - 30);
+	
+	const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+	const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+	const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+	
+	switch (quickFilter) {
+		case 'today':
+			startDateInput.value = today.toISOString().split('T')[0];
+			endDateInput.value = today.toISOString().split('T')[0];
+			break;
+		case 'yesterday':
+			startDateInput.value = yesterday.toISOString().split('T')[0];
+			endDateInput.value = yesterday.toISOString().split('T')[0];
+			break;
+		case 'last7days':
+			startDateInput.value = last7Days.toISOString().split('T')[0];
+			endDateInput.value = today.toISOString().split('T')[0];
+			break;
+		case 'last30days':
+			startDateInput.value = last30Days.toISOString().split('T')[0];
+			endDateInput.value = today.toISOString().split('T')[0];
+			break;
+		case 'thisMonth':
+			startDateInput.value = thisMonthStart.toISOString().split('T')[0];
+			endDateInput.value = today.toISOString().split('T')[0];
+			break;
+		case 'lastMonth':
+			startDateInput.value = lastMonthStart.toISOString().split('T')[0];
+			endDateInput.value = lastMonthEnd.toISOString().split('T')[0];
+			break;
+		default:
+			startDateInput.value = '';
+			endDateInput.value = '';
+	}
+	
+	// Trigger search with new dates
+	VoiceCallingUI.searchNotifications();
+};
+
+VoiceCallingUI.clearDateFilters = function() {
+	document.getElementById('notificationStartDate').value = '';
+	document.getElementById('notificationEndDate').value = '';
+	document.getElementById('notificationQuickFilter').value = '';
+	document.getElementById('notificationSearchInput').value = '';
+	
+	VoiceCallingUI.loadNotifications(1, '', '', '');
+};
+
+// Export responses to Excel
+VoiceCallingUI.exportResponses = function() {
+	const searchInput = document.getElementById('notificationSearchInput');
+	const startDateInput = document.getElementById('notificationStartDate');
+	const endDateInput = document.getElementById('notificationEndDate');
+	
+	const searchTerm = searchInput.value.trim();
+	const startDate = startDateInput.value;
+	const endDate = endDateInput.value;
+	
+	// Build export URL with current filters
+	const params = new URLSearchParams({
+		search: searchTerm,
+		startDate: startDate,
+		endDate: endDate
+	});
+	
+	const exportUrl = `/api/voice/notifications/export?${params}`;
+	
+	// Create a temporary link to trigger download
+	const link = document.createElement('a');
+	link.href = exportUrl;
+	link.download = `voice_responses_${new Date().toISOString().split('T')[0]}.csv`;
+	document.body.appendChild(link);
+	link.click();
+	document.body.removeChild(link);
+};
+
+// Campaign History functionality
+VoiceCallingUI.history = {
+	currentPage: 1,
+	itemsPerPage: 25,
+	totalItems: 0,
+	allHistory: [],
+	filteredHistory: []
+};
+
+VoiceCallingUI.loadHistory = function(page = 1, search = '') {
+	const params = new URLSearchParams({
+		page: page,
+		limit: this.history.itemsPerPage,
+		search: search
+	});
+	
+	return fetch(`/api/voice/campaigns/history?${params}`, { credentials: 'include' })
+		.then(response => response.ok ? response.json() : { campaigns: [], pagination: {} })
+		.then(data => {
+			this.history.allHistory = data.campaigns || [];
+			this.history.currentPage = data.pagination.currentPage || 1;
+			this.history.totalItems = data.pagination.totalItems || 0;
+			
+			this.renderHistory(data.campaigns);
+			this.renderHistoryPagination(data.pagination);
+			this.updateHistoryCount(data.pagination.totalItems, search);
+		})
+		.catch(error => {
+			console.error('Load history error:', error);
+			this.renderHistory([]);
+		});
+};
+
+VoiceCallingUI.renderHistory = function(campaigns) {
+	const container = document.getElementById('historyList');
+	
+	if (!campaigns || campaigns.length === 0) {
+		container.innerHTML = `
+			<div class="p-8 text-center text-gray-500">
+				<svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+				</svg>
+				<p>No campaign history found</p>
+				<p class="text-xs mt-1">Past AI voice campaigns will appear here</p>
+			</div>
+		`;
+		return;
+	}
+	
+	container.innerHTML = campaigns.map(campaign => {
+		const startDate = new Date(campaign.timestamp || campaign.startedAt || campaign.createdAt).toLocaleString();
+		const statusColor = campaign.status === 'completed' ? 'bg-green-100 text-green-800' : 
+						   campaign.status === 'running' ? 'bg-yellow-100 text-yellow-800' : 
+						   'bg-gray-100 text-gray-800';
+		
+		return `
+			<div class="p-4 hover:bg-gray-50 border-l-4 border-indigo-400">
+				<div class="flex items-start justify-between">
+					<div class="flex-1">
+						<div class="flex items-center space-x-3 mb-3">
+							<div class="bg-indigo-100 rounded-full p-2">
+								<svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+								</svg>
+							</div>
+							<div>
+								<div class="font-medium text-gray-900">${campaign.name || 'Unnamed Campaign'}</div>
+								<div class="flex items-center space-x-2 text-xs text-gray-500">
+									<span>Started: ${startDate}</span>
+									<span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${statusColor}">
+										${campaign.status || 'unknown'}
+									</span>
+								</div>
+								${campaign.recipientCount ? `<div class="text-xs text-gray-500">Recipients: ${campaign.recipientCount}</div>` : ''}
+							</div>
+						</div>
+						
+						<div class="ml-11 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+							<div class="text-sm font-medium text-blue-800 mb-1">Campaign Message:</div>
+							<div class="text-sm text-blue-700">"${campaign.message || campaign.body || 'Message not available'}"</div>
+						</div>
+						
+						${campaign.voice || campaign.language ? `
+							<div class="ml-11 mt-2 text-xs text-gray-600">
+								${campaign.voice ? `Voice: ${campaign.voice}` : ''} 
+								${campaign.voice && campaign.language ? ' • ' : ''}
+								${campaign.language ? `Language: ${campaign.language}` : ''}
+							</div>
+						` : ''}
+					</div>
+				</div>
+			</div>
+		`;
+	}).join('');
+};
+
+VoiceCallingUI.renderHistoryPagination = function(pagination) {
+	const paginationContainer = document.getElementById('historyPagination');
+	const paginationInfo = document.getElementById('historyPaginationInfo');
+	const prevButton = document.getElementById('historyPrevPage');
+	const nextButton = document.getElementById('historyNextPage');
+	const pageNumbers = document.getElementById('historyPageNumbers');
+	
+	if (!pagination || pagination.totalItems === 0) {
+		paginationContainer.classList.add('hidden');
+		return;
+	}
+	
+	paginationContainer.classList.remove('hidden');
+	
+	// Update pagination info
+	paginationInfo.textContent = `Showing ${pagination.startIndex}-${pagination.endIndex} of ${pagination.totalItems} campaigns`;
+	
+	// Update page numbers
+	pageNumbers.textContent = `${pagination.currentPage} / ${pagination.totalPages}`;
+	
+	// Update button states
+	prevButton.disabled = pagination.currentPage === 1;
+	nextButton.disabled = pagination.currentPage === pagination.totalPages;
+	
+	// Add click handlers
+	prevButton.onclick = () => {
+		if (pagination.currentPage > 1) {
+			VoiceCallingUI.loadHistory(pagination.currentPage - 1, document.getElementById('historySearchInput').value);
+		}
+	};
+	
+	nextButton.onclick = () => {
+		if (pagination.currentPage < pagination.totalPages) {
+			VoiceCallingUI.loadHistory(pagination.currentPage + 1, document.getElementById('historySearchInput').value);
+		}
+	};
+};
+
+VoiceCallingUI.updateHistoryCount = function(total, search) {
+	const countElement = document.getElementById('historyCount');
+	const filterElement = document.getElementById('historyFilter');
+	
+	countElement.textContent = `${total} campaign${total !== 1 ? 's' : ''}`;
+	
+	if (search && search.trim()) {
+		filterElement.textContent = `Filtered by: "${search}"`;
+		filterElement.classList.remove('hidden');
+	} else {
+		filterElement.classList.add('hidden');
+	}
+};
+
+VoiceCallingUI.searchHistory = function() {
+	const searchInput = document.getElementById('historySearchInput');
+	const searchTerm = searchInput.value.trim();
+	
+	VoiceCallingUI.loadHistory(1, searchTerm);
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+	VoiceCallingUI.showTab('agents');
+	VoiceCallingUI.fetchAgents();
+	VoiceCallingUI.refreshMonitor();
+	setInterval(function() { VoiceCallingUI.refreshMonitor(); }, 5000);
+
+	// Auto-fill language when a voice is selected (if language is empty)
+	const voiceSelect = document.getElementById('agentVoice');
+	const langSelect = document.getElementById('agentLanguage');
+	voiceSelect.addEventListener('change', function() {
+		const opt = voiceSelect.options[voiceSelect.selectedIndex];
+		const lang = opt && opt.getAttribute('data-lang');
+		if (lang && (!langSelect.value || langSelect.value.trim() === '')) {
+			// Try to find matching language option
+			for (let i = 0; i < langSelect.options.length; i++) {
+				if (langSelect.options[i].value === lang) {
+					langSelect.value = lang;
+					break;
+				}
+			}
+		}
+	});
+	
+	// Phone number formatting (removed since we no longer have phone input fields)
+	
+	// Real-time contact search and filtering
+	const contactSearch = document.getElementById('contactSearch');
+	const contactCategory = document.getElementById('contactCategory');
+	
+	if (contactSearch) {
+		contactSearch.addEventListener('input', function() {
+			clearTimeout(VoiceCallingUI.searchTimeout);
+			VoiceCallingUI.searchTimeout = setTimeout(function() {
+				VoiceCallingUI.loadContacts();
+			}, 300);
+		});
+	}
+	
+	if (contactCategory) {
+		contactCategory.addEventListener('change', function() {
+			VoiceCallingUI.loadContacts();
+		});
+	}
+	
+	// Real-time notification search
+	const notificationSearch = document.getElementById('notificationSearchInput');
+	if (notificationSearch) {
+		notificationSearch.addEventListener('input', function() {
+			clearTimeout(VoiceCallingUI.notificationSearchTimeout);
+			VoiceCallingUI.notificationSearchTimeout = setTimeout(function() {
+				VoiceCallingUI.searchNotifications();
+			}, 300);
+		});
+		
+		// Allow Enter key to trigger search
+		notificationSearch.addEventListener('keypress', function(e) {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				VoiceCallingUI.searchNotifications();
+			}
+		});
+	}
+	
+	// Date filter change handlers
+	const startDateInput = document.getElementById('notificationStartDate');
+	const endDateInput = document.getElementById('notificationEndDate');
+	
+	if (startDateInput) {
+		startDateInput.addEventListener('change', function() {
+			VoiceCallingUI.searchNotifications();
+		});
+	}
+	
+	if (endDateInput) {
+		endDateInput.addEventListener('change', function() {
+			VoiceCallingUI.searchNotifications();
+		});
+	}
+	
+	// Real-time history search
+	const historySearch = document.getElementById('historySearchInput');
+	if (historySearch) {
+		historySearch.addEventListener('input', function() {
+			clearTimeout(VoiceCallingUI.historySearchTimeout);
+			VoiceCallingUI.historySearchTimeout = setTimeout(function() {
+				VoiceCallingUI.searchHistory();
+			}, 300);
+		});
+		
+		// Allow Enter key to trigger search
+		historySearch.addEventListener('keypress', function(e) {
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				VoiceCallingUI.searchHistory();
+			}
+		});
+	}
+});
+</script>
+

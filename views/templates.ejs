@@ -1,0 +1,3304 @@
+<%- include('partials/nav') %>
+
+<!-- Load Utilities -->
+<script src="/js/utils/api.js"></script>
+<script src="/js/utils/shared.js"></script>
+<script src="/js/utils/imageUtils.js"></script>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <!-- Toast Notification -->
+    <div v-if="toast.show" 
+         :class="{
+             'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300': true,
+             'bg-green-500 text-white': toast.type === 'success',
+             'bg-red-500 text-white': toast.type === 'error',
+             'bg-yellow-500 text-white': toast.type === 'warning',
+             'bg-blue-500 text-white': toast.type === 'info'
+         }">
+        <div class="flex items-center justify-between">
+            <span class="text-sm font-medium">{{ toast.message }}</span>
+            <button @click="toast.show = false" class="ml-4 text-white hover:text-gray-200">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <div class="py-6 space-y-6">
+        <!-- Template List -->
+        <div class="bg-white shadow rounded-lg p-6" v-if="!editingTemplate">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-3 sm:space-y-0">
+                <h2 class="text-xl font-semibold">Email Templates</h2>
+                <div class="flex space-x-4">
+                    <button @click="createNewTemplate" 
+                            class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                        Create New Template
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search and Filter Section -->
+            <div class="bg-gray-50 border rounded-lg p-4 mb-6">
+                <div class="space-y-4">
+                    <!-- Search Bar -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Search Templates</label>
+                        <div class="flex flex-col sm:flex-row gap-2">
+                            <div class="flex-1 min-w-0">
+                                <input v-model="searchQuery" 
+                                       type="text" 
+                                       placeholder="Search by name, content, or tags..."
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base">
+                            </div>
+                            <div class="flex gap-2 sm:w-auto">
+                                <button @click="/* explicit search trigger if needed */ null" 
+                                        class="px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">
+                                    Search
+                                </button>
+                                <button @click="clearSearch"
+                                        :disabled="!searchQuery && selectedCategory === 'all' && selectedTags.length === 0"
+                                        class="px-3 sm:px-4 py-2 border rounded hover:bg-gray-100 disabled:opacity-50 text-sm">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Filter -->
+                    <div v-if="availableCategories.length > 0">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Category</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="selectedCategory = 'all'"
+                                    :class="{
+                                        'px-3 py-1 rounded-full text-sm font-medium': true,
+                                        'bg-indigo-600 text-white': selectedCategory === 'all',
+                                        'bg-gray-200 text-gray-700 hover:bg-gray-300': selectedCategory !== 'all'
+                                    }">
+                                All Categories
+                            </button>
+                            <button v-for="category in availableCategories"
+                                    :key="category"
+                                    @click="selectedCategory = category"
+                                    :class="{
+                                        'px-3 py-1 rounded-full text-sm font-medium': true,
+                                        'bg-indigo-600 text-white': selectedCategory === category,
+                                        'bg-gray-200 text-gray-700 hover:bg-gray-300': selectedCategory !== category
+                                    }">
+                                {{ category.charAt(0).toUpperCase() + category.slice(1) }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tag Filter -->
+                    <div v-if="availableTagsList.length > 0">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Tags</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button v-for="tag in availableTagsList"
+                                    :key="tag"
+                                    @click="toggleTagFilter(tag)"
+                                    :class="{
+                                        'px-3 py-1 rounded-full text-sm font-medium': true,
+                                        'bg-indigo-600 text-white': isTagSelected(tag),
+                                        'bg-gray-200 text-gray-700 hover:bg-gray-300': !isTagSelected(tag)
+                                    }">
+                                {{ tag }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Results Summary -->
+                    <div class="text-sm text-gray-600">
+                        <span v-if="searchQuery || selectedCategory !== 'all' || selectedTags.length > 0">
+                            Showing {{ filteredTemplates.length }} of {{ templates.length }} templates
+                        </span>
+                        <span v-else>
+                            {{ templates.length }} templates total
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add a loading message -->
+            <div v-if="isLoading" class="mt-4 text-sm text-gray-600 bg-blue-50 p-4 rounded">
+                <p class="font-medium">AI is crafting your template...</p>
+                <p class="mt-1">This usually takes 15-30 seconds. The template will be optimized for your topic and tone.</p>
+            </div>
+
+            <div v-if="!editingTemplate" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <!-- Default Template Card -->
+                <div class="border rounded-lg overflow-hidden">
+                    <div class="relative bg-gray-100 border-0" style="height: 100px; background-color: #f3f4f6 !important;">
+                        <img :src="defaultTemplate.headerImage" 
+                             class="absolute inset-0 w-full h-full object-cover border-0" 
+                             style="background-color: transparent !important;"
+                             alt="Default template preview">
+                        <div class="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 mix-blend-multiply"></div>
+                        <div class="absolute inset-0 flex items-center justify-center p-4">
+                            <h3 class="text-white text-sm sm:text-base md:text-lg lg:text-xl font-bold text-center leading-tight">{{ defaultTemplate.headerText }}</h3>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-lg mb-2">{{ defaultTemplate.name }}</h3>
+                        <p class="text-gray-600 text-sm mb-4">System Default Template</p>
+                        <div class="flex space-x-2">
+                            <button @click="saveAsNewTemplate(defaultTemplate)" 
+                                    class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600">
+                                Save Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Existing Templates -->
+                <div v-for="template in filteredTemplates" 
+                     :key="template.id" 
+                     class="border rounded-lg">
+                    <div class="relative h-[140px] bg-gray-50 overflow-hidden z-10 border border-gray-200">
+                        <img :src="normalizeImageUrl(template.headerImage) || '/placeholder.svg'" 
+                             class="!w-full !h-full !object-contain !border-0 !block !visible !opacity-100 !z-50 !relative" 
+                             style="background-color: transparent !important;"
+                             alt="Template preview"
+                             @error="handleImageError($event, template)"
+                             @load="handleImageLoad($event, template)"
+                             @click="debugImage(template)">
+                    </div>
+                    <div class="p-4">
+                        <h3 class="font-semibold text-lg mb-2">{{ template.name }}</h3>
+                        <p class="text-gray-600 text-sm mb-2">Last edited: {{ new Date(template.updatedAt).toLocaleDateString() }}</p>
+                        <div class="mb-3">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {{ template.category || 'Uncategorized' }}
+                            </span>
+                        </div>
+                        <div class="mb-3 flex flex-wrap gap-1">
+                            <span v-for="tag in template.tags" 
+                                  :key="tag"
+                                  class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                {{ tag }}
+                            </span>
+                        </div>
+                        <div class="flex space-x-2">
+                            <button v-if="!template.isDefault" @click="editTemplate(template)" 
+                                    class="bg-blue-500 text-white px-3 py-1 rounded text-sm">
+                                Edit
+                            </button>
+                            <button v-if="template.isDefault" 
+                                    class="bg-gray-400 text-white px-3 py-1 rounded text-sm cursor-not-allowed">
+                                Default
+                            </button>
+                            <button @click="showVersionHistory(template)" 
+                                    class="bg-gray-500 text-white px-3 py-1 rounded text-sm">
+                                History
+                            </button>
+                            <button v-if="!template.isDefault"
+                                    @click="deleteTemplate(template.id)" 
+                                    class="bg-red-500 text-white px-3 py-1 rounded text-sm">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- No Results Message -->
+                <div v-if="filteredTemplates.length === 0 && (searchQuery || selectedCategory !== 'all' || selectedTags.length > 0)"
+                     class="col-span-full text-center py-12">
+                    <div class="text-gray-500">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                        </svg>
+                        <h3 class="mt-2 text-sm font-medium text-gray-900">No templates found</h3>
+                        <p class="mt-1 text-sm text-gray-500">
+                            Try adjusting your search criteria or filters.
+                        </p>
+                        <div class="mt-6">
+                            <button @click="clearSearch"
+                                    class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template Editor -->
+        <div v-else class="space-y-6">
+            <!-- Floating Jump to Preview Button -->
+            <div v-if="!isAiImageModalVisible && !isAiHtmlModalVisible && !isImageLibraryModalVisible" 
+                 style="position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 999999; pointer-events: auto;">
+                <button @click="scrollToPreview" 
+                        class="bg-indigo-600 text-white px-3 py-2 rounded-l-lg shadow-2xl hover:bg-indigo-700 transition-all duration-200 flex items-center space-x-1 group border-2 border-white" 
+                        style="z-index: 999999;">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">Preview</span>
+                    <div class="absolute left-full ml-1 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap" 
+                         style="z-index: 1000000;">
+                        Jump to Preview
+                    </div>
+                </button>
+            </div>
+            
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-3 sm:space-y-0">
+                    <h2 class="text-xl font-semibold">
+                        {{ currentTemplate.id ? 'Edit Template' : 'Create New Template' }}
+                    </h2>
+                    <button @click="cancelEdit" 
+                            class="text-gray-600 hover:text-gray-800">
+                        ← Back to Templates
+                    </button>
+                </div>
+
+                <div class="space-y-6">
+                    <!-- Template Name -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Template Name</label>
+                        <input v-model="currentTemplate.name" 
+                               :class="{
+                                   'mt-1 block w-full border rounded-md px-3 py-2': true,
+                                   'border-red-500': validation.errors.name
+                               }"
+                               placeholder="Enter template name">
+                        <p v-if="validation.errors.name" class="mt-1 text-sm text-red-600">
+                            {{ validation.errors.name }}
+                        </p>
+                    </div>
+
+                    <!-- Category and Tags -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Category</label>
+                            <select v-model="currentTemplate.category" 
+                                    class="mt-1 block w-full pl-3 pr-10 py-2 border rounded-md">
+                                <option value="marketing">Marketing</option>
+                                <option value="newsletter">Newsletter</option>
+                                <option value="promotional">Promotional</option>
+                                <option value="announcement">Announcement</option>
+                                <option value="welcome">Welcome</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Tags</label>
+                            <div class="mt-1 flex flex-wrap gap-2">
+                                <span v-for="(tag, index) in currentTemplate.tags" 
+                                      :key="index"
+                                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                    {{ tag }}
+                                    <button @click="removeTag(index)" 
+                                            class="ml-1 text-indigo-600 hover:text-indigo-800">
+                                        ×
+                                    </button>
+                                </span>
+                                <input v-if="!showTagInput"
+                                       @click="showTagInput = true"
+                                       @keyup.enter="addTag"
+                                       v-model="newTag"
+                                       class="inline-flex items-center px-2 py-1 text-xs text-gray-500 border border-dashed border-gray-300 rounded cursor-text hover:border-gray-400"
+                                       placeholder="+ Add tag">
+                                <input v-else
+                                       @blur="addTag"
+                                       @keyup.enter="addTag"
+                                       v-model="newTag"
+                                       class="inline-flex items-center px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                       placeholder="Enter tag name"
+                                       ref="tagInput">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Header Section -->
+                    <div class="border rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium">Header</h3>
+                            <button @click="showTip('header')" 
+                                    class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- Section description -->
+                        <p class="text-sm text-gray-600 mb-4">Background image for your email header. Use the "Header Text" field below for your main title—text overlays look crisp and are easy to edit.</p>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Header Image</label>
+                                <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                                    <strong>Recommended size:</strong> {{ getImageRequirements('header') }}
+                                    <br><span class="text-blue-600">💡 Best practice: Let AI create a clean background and use the Header Text field for your wording.</span>
+                                </div>
+                                <div class="space-y-3">
+                                    <input v-model="currentTemplate.headerImage" 
+                                           class="w-full border rounded-md px-3 py-2" 
+                                           placeholder="Enter image URL">
+                                    <div class="flex flex-wrap" style="gap: 12px !important; margin-bottom: 16px !important;">
+                                        <div class="relative">
+                                            <input type="file" 
+                                                   @change="uploadImage($event, 'header')" 
+                                                   accept="image/*"
+                                                   :disabled="uploadingImages['header_main']"
+                                                   class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                            <button :disabled="uploadingImages['header_main']"
+                                                    :class="{
+                                                        'px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap': true,
+                                                        'bg-indigo-600 text-white hover:bg-indigo-700': !uploadingImages['header_main'],
+                                                        'bg-gray-400 text-gray-200 cursor-not-allowed': uploadingImages['header_main']
+                                                    }">
+                                                <span v-if="!uploadingImages['header_main']" class="flex items-center space-x-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                                    </svg>
+                                                    <span>Upload Image</span>
+                                                </span>
+                                                <span v-else class="flex items-center space-x-2">
+                                                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span class="text-sm">{{ processingImage ? 'Processing...' : (uploadProgress['header_main'] || 0) + '%' }}</span>
+                                                </span>
+                                            </button>
+                                        </div>
+                                        <button @click="showAiImageModal('header')" 
+                                                :disabled="generatingAiImage"
+                                                :class="{
+                                                    'px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap': true,
+                                                    'bg-green-600 text-white hover:bg-green-700': !generatingAiImage,
+                                                    'bg-gray-400 text-gray-200 cursor-not-allowed': generatingAiImage
+                                                }">
+                                            <span v-if="!generatingAiImage" class="flex items-center space-x-2">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                </svg>
+                                                <span>AI Image</span>
+                                            </span>
+                                            <span v-else class="flex items-center space-x-2">
+                                                <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                <span>Generating...</span>
+                                            </span>
+                                        </button>
+                                        <button @click="showImageLibraryModal('header')" 
+                                                class="px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600 flex items-center space-x-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                            </svg>
+                                            <span>Upload from Library</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                    <div v-if="currentTemplate.headerImage" class="mt-4">
+                                        <div class="relative bg-gray-100 rounded-lg p-4 border-2 border-dashed border-gray-300" style="min-height: 160px;">
+                                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                                <!-- Image Thumbnail -->
+                                                <div class="flex-shrink-0">
+                                                    <div class="relative rounded overflow-hidden" style="width: 300px; min-height: 100px; max-height: 150px; background: #f3f4f6;">
+                                                        <img :src="currentTemplate.headerImage" 
+                                                             class="w-full h-full object-cover"
+                                                             alt="Header image preview">
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Action Buttons -->
+                                                <div class="flex flex-wrap gap-2 flex-1 min-w-0">
+                                                    <button @click="removeImage('header')" 
+                                                            class="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
+                                                        Delete
+                                                    </button>
+                                                    <button @click="addToLibrary('header', currentTemplate.headerImage)" 
+                                                            class="bg-indigo-600 text-white px-3 py-2 rounded text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap">
+                                                        Add to Library
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Header Text</label>
+                                <!-- Text formatting toolbar -->
+                                <div class="mt-1 border rounded-md overflow-hidden">
+                                    <div class="flex items-center gap-3 px-3 py-2 bg-gray-100 border-b flex-wrap">
+                                        <!-- Font size selector -->
+                                        <select v-model="currentTemplate.headerTextStyle.fontSize" 
+                                                class="text-sm border rounded px-2 py-1.5 bg-white">
+                                            <option value="text-lg">Small</option>
+                                            <option value="text-xl">Medium</option>
+                                            <option value="text-2xl">Large</option>
+                                            <option value="text-3xl">X-Large</option>
+                                            <option value="text-4xl">XX-Large</option>
+                                        </select>
+                                        <!-- Bold button -->
+                                        <button type="button"
+                                                @click="currentTemplate.headerTextStyle.bold = !currentTemplate.headerTextStyle.bold"
+                                                :style="currentTemplate.headerTextStyle.bold ? 'background-color: #4f46e5; color: white;' : 'background-color: white; color: #374151;'"
+                                                class="w-8 h-8 flex items-center justify-center border rounded text-sm font-bold hover:opacity-80"
+                                                title="Bold">
+                                            B
+                                        </button>
+                                        <!-- Italic button -->
+                                        <button type="button"
+                                                @click="toggleItalic"
+                                                :style="currentTemplate.headerTextStyle.italic ? 'background-color: #4f46e5; color: white;' : 'background-color: white; color: #374151;'"
+                                                class="w-8 h-8 flex items-center justify-center border rounded text-sm hover:opacity-80"
+                                                style="font-style: italic; font-family: serif;"
+                                                title="Italic">
+                                            I
+                                        </button>
+                                        <!-- Separator -->
+                                        <span class="text-gray-300 mx-1">|</span>
+                                        <!-- Alignment buttons -->
+                                        <button type="button"
+                                                @click="currentTemplate.headerTextStyle.align = 'left'"
+                                                :style="currentTemplate.headerTextStyle.align === 'left' ? 'background-color: #4f46e5; color: white;' : 'background-color: white; color: #374151;'"
+                                                class="w-8 h-8 flex items-center justify-center border rounded hover:opacity-80"
+                                                title="Align Left">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h14"></path>
+                                            </svg>
+                                        </button>
+                                        <button type="button"
+                                                @click="currentTemplate.headerTextStyle.align = 'center'"
+                                                :style="currentTemplate.headerTextStyle.align === 'center' ? 'background-color: #4f46e5; color: white;' : 'background-color: white; color: #374151;'"
+                                                class="w-8 h-8 flex items-center justify-center border rounded hover:opacity-80"
+                                                title="Align Center">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M7 12h10M5 18h14"></path>
+                                            </svg>
+                                        </button>
+                                        <button type="button"
+                                                @click="currentTemplate.headerTextStyle.align = 'right'"
+                                                :style="currentTemplate.headerTextStyle.align === 'right' ? 'background-color: #4f46e5; color: white;' : 'background-color: white; color: #374151;'"
+                                                class="w-8 h-8 flex items-center justify-center border rounded hover:opacity-80"
+                                                title="Align Right">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M10 12h10M6 18h14"></path>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <!-- Text input -->
+                                    <input v-model="currentTemplate.headerText" 
+                                           class="w-full px-3 py-2 border-0 focus:ring-0"
+                                           :style="{
+                                               fontWeight: currentTemplate.headerTextStyle.bold ? 'bold' : 'normal',
+                                               fontStyle: currentTemplate.headerTextStyle.italic ? 'italic' : 'normal',
+                                               textAlign: currentTemplate.headerTextStyle.align || 'center'
+                                           }"
+                                           placeholder="Enter header text">
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500">This text will be overlaid on your header image.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Banner Image Section -->
+                    <div class="mb-6">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="block text-sm font-medium text-gray-700">Banner Image</label>
+                            <button @click="showTip('banner')" 
+                                    class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- Section description -->
+                        <p class="text-sm text-gray-600 mb-3">Promotional banner displayed below the header. Great for seasonal themes, product highlights, or decorative visuals.</p>
+                        <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                            <strong>Recommended size:</strong> {{ getImageRequirements('banner') }}
+                            <br><span class="text-blue-600">💡 AI generates text-free backgrounds. Add any promotional text via a Text Block for perfect spelling.</span>
+                        </div>
+
+                        <div class="space-y-3">
+                            <input v-model="currentTemplate.bannerImage" 
+                                   class="w-full border rounded-md px-3 py-2" 
+                                   placeholder="Enter image URL">
+                            <div class="flex flex-wrap" style="gap: 12px !important; margin-bottom: 16px !important;">
+                                <div class="relative">
+                                    <input type="file" 
+                                           @change="uploadImage($event, 'banner')" 
+                                           accept="image/*"
+                                           :disabled="uploadingImages['banner_main']"
+                                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                    <button :disabled="uploadingImages['banner_main']"
+                                            :class="{
+                                                'px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap': true,
+                                                'bg-indigo-600 text-white hover:bg-indigo-700': !uploadingImages['banner_main'],
+                                                'bg-gray-400 text-gray-200 cursor-not-allowed': uploadingImages['banner_main']
+                                            }">
+                                        <span v-if="!uploadingImages['banner_main']" class="flex items-center space-x-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                            </svg>
+                                            <span>Upload Image</span>
+                                        </span>
+                                        <span v-else class="flex items-center space-x-2">
+                                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            <span class="text-sm">{{ processingImage ? 'Processing...' : (uploadProgress['banner_main'] || 0) + '%' }}</span>
+                                        </span>
+                                    </button>
+                                </div>
+                                <button @click="showAiImageModal('banner')" 
+                                        :disabled="generatingAiImage"
+                                        :class="{
+                                            'px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap': true,
+                                            'bg-green-600 text-white hover:bg-green-700': !generatingAiImage,
+                                            'bg-gray-400 text-gray-200 cursor-not-allowed': generatingAiImage
+                                        }">
+                                    <span v-if="!generatingAiImage" class="flex items-center space-x-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                        <span>AI Image</span>
+                                    </span>
+                                    <span v-else class="flex items-center space-x-2">
+                                        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <span>Generating...</span>
+                                    </span>
+                                </button>
+                                <button @click="showImageLibraryModal('banner')" 
+                                        class="px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600 flex items-center space-x-2">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                            </svg>
+                                            <span>Upload from Library</span>
+                                        </button>
+                            </div>
+                        </div>
+                        <div v-if="currentTemplate.bannerImage" class="mt-4">
+                            <div class="relative bg-gray-100 rounded-lg p-4 border-2 border-dashed border-gray-300" style="min-height: 140px;">
+                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                    <!-- Image Thumbnail -->
+                                    <div class="flex-shrink-0">
+                                        <div class="relative rounded overflow-hidden" style="width: 240px; height: 96px; background: white;">
+                                            <img :src="currentTemplate.bannerImage" 
+                                                 class="absolute inset-0 w-full h-full object-cover"
+                                                 alt="Banner image preview">
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Action Buttons -->
+                                    <div class="flex flex-wrap gap-2 flex-1 min-w-0">
+                                        <button @click="removeImage('banner')" 
+                                                class="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
+                                            Delete
+                                        </button>
+                                        <button @click="addToLibrary('banner', currentTemplate.bannerImage)" 
+                                                class="bg-indigo-600 text-white px-3 py-2 rounded text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap">
+                                            Add to Library
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Body Section -->
+                    <div class="border rounded-lg p-4" style="min-height: 400px !important; padding-bottom: 40px !important;">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium">Body Content</h3>
+                            <button @click="showTip('body')" 
+                                    class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div v-if="validation.errors.body" class="mb-4 p-3 bg-red-50 border border-red-200 rounded">
+                            <p class="text-sm text-red-600">{{ validation.errors.body }}</p>
+                        </div>
+                        
+                        <!-- Text Content Section -->
+                        <div class="mb-6">
+                            <div class="mb-3">
+                                <h4 class="text-lg font-medium text-gray-800 mb-3">Text Content</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    <button @click="addBodyElement('text')" 
+                                            class="bg-gray-100 px-4 py-2 rounded text-sm hover:bg-gray-200 transition-colors whitespace-nowrap flex items-center space-x-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                        <span>Add Text</span>
+                                    </button>
+                                    <button @click="showAiHtmlModal" 
+                                            class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 flex items-center space-x-2 transition-colors whitespace-nowrap">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                        <span>AI Generate HTML</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <!-- Text Elements -->
+                            <div class="space-y-3">
+                                <div v-for="(element, index) in currentTemplate.bodyElements.filter(e => e.type === 'text')" 
+                                     :key="index" 
+                                     class="border rounded-lg p-4 bg-gray-50">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <span class="text-sm font-medium capitalize text-gray-700">{{ element.type === 'text' ? 'Text Block' : 'Button' }}</span>
+                                        <button @click="removeBodyElement(currentTemplate.bodyElements.indexOf(element))" 
+                                                class="text-red-500 text-sm hover:text-red-700">
+                                            Remove
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Validation error for this element -->
+                                    <div v-if="validation.errors[`body_${currentTemplate.bodyElements.indexOf(element)}`]" class="mb-3 p-2 bg-red-50 border border-red-200 rounded">
+                                        <p class="text-sm text-red-600">{{ validation.errors[`body_${currentTemplate.bodyElements.indexOf(element)}`] }}</p>
+                                    </div>
+                                    
+                                    <div v-if="element.type === 'text'" class="space-y-3">
+                                        <div class="flex justify-between items-center">
+                                            <label class="text-sm font-medium text-gray-700">Content (Supports HTML)</label>
+                                            <button @click="togglePreview(currentTemplate.bodyElements.indexOf(element))" 
+                                                    class="text-sm text-indigo-600 hover:text-indigo-800">
+                                                {{ element.showPreview ? 'Edit' : 'Preview' }}
+                                            </button>
+                                        </div>
+                                        <textarea v-if="!element.showPreview"
+                                                  v-model="element.content" 
+                                                  class="w-full border rounded-md px-3 py-2 font-mono text-sm" 
+                                                  rows="5"
+                                                  placeholder="Enter text or HTML content"></textarea>
+                                        <div v-else 
+                                             v-html="element.content"
+                                             class="border rounded-md p-3 bg-white"></div>
+                                    </div>
+                                    
+                                    <div v-if="element.type === 'button'" class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Button Text</label>
+                                            <input v-model="element.text" 
+                                                   class="w-full border rounded-md px-3 py-2" 
+                                                   placeholder="Enter button text">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Button URL</label>
+                                            <input v-model="element.url" 
+                                                   class="w-full border rounded-md px-3 py-2" 
+                                                   placeholder="Enter button URL">
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Empty state for text content -->
+                                <div v-if="!currentTemplate.bodyElements.some(e => e.type === 'text')" 
+                                     class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900">No text content yet</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Add text blocks, buttons, or use AI to generate content.</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Image Content Section -->
+                        <div class="border-t pt-6">
+                            <div class="mb-3">
+                                <h4 class="text-lg font-medium text-gray-800 mb-3">Images & Buttons</h4>
+                                <!-- Section description -->
+                                <p class="text-sm text-gray-600 mb-3">Add product photos, illustrations, or AI-generated visuals. For any text overlays, use a Text Block above or below the image.</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <button @click="addBodyElement('image')" 
+                                            class="bg-indigo-600 text-white px-4 py-2 rounded text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap flex items-center space-x-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                        </svg>
+                                        <span>Upload Image</span>
+                                    </button>
+                                    <button @click="addBodyElement('button')" 
+                                            class="bg-gray-100 px-4 py-2 rounded text-sm hover:bg-gray-200 transition-colors whitespace-nowrap flex items-center space-x-2">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                        <span>Add Button</span>
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                                <strong>Recommended size:</strong> {{ getImageRequirements('body') }}
+                                <br><span class="text-blue-600">💡 AI creates visuals without embedded text. Add captions or calls-to-action via Text Blocks for accuracy.</span>
+                            </div>
+                            
+                            <!-- Image Elements -->
+                            <div class="space-y-4">
+                                <div v-for="(element, index) in currentTemplate.bodyElements.filter(e => e.type === 'image')" 
+                                     :key="index" 
+                                     class="border rounded-lg p-4 bg-gray-50">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <span class="text-sm font-medium text-gray-700">Image Block</span>
+                                        <button @click="removeBodyElement(currentTemplate.bodyElements.indexOf(element))" 
+                                                class="text-red-500 text-sm hover:text-red-700">
+                                            Remove
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Validation error for this element -->
+                                    <div v-if="validation.errors[`body_${currentTemplate.bodyElements.indexOf(element)}`]" class="mb-3 p-2 bg-red-50 border border-red-200 rounded">
+                                        <p class="text-sm text-red-600">{{ validation.errors[`body_${currentTemplate.bodyElements.indexOf(element)}`] }}</p>
+                                    </div>
+                                    
+                                    <div class="space-y-4">
+                                        <!-- Image URL and Upload Controls -->
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+                                                <input v-model="element.url" 
+                                                       class="w-full border rounded-md px-3 py-2" 
+                                                       placeholder="Enter image URL or upload an image">
+                                            </div>
+                                            
+                                            <!-- Image Alt Text -->
+                                            <div>
+                                                <label class="block text-sm font-medium text-gray-700 mb-1">Alt Text</label>
+                                                <input v-model="element.alt" 
+                                                       class="w-full border rounded-md px-3 py-2" 
+                                                       placeholder="Enter image alt text for accessibility">
+                                            </div>
+                                            
+                                            <div class="flex gap-2">
+                                                <div class="relative">
+                                                    <input type="file" 
+                                                           @change="uploadImage($event, 'body', currentTemplate.bodyElements.indexOf(element))" 
+                                                           accept="image/*"
+                                                           :disabled="uploadingImages[`body_${currentTemplate.bodyElements.indexOf(element)}`]"
+                                                           class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                                    <button :disabled="uploadingImages[`body_${currentTemplate.bodyElements.indexOf(element)}`]"
+                                                            :class="{
+                                                                'px-4 py-2 rounded text-sm font-medium': true,
+                                                                'bg-indigo-600 text-white hover:bg-indigo-700': !uploadingImages[`body_${currentTemplate.bodyElements.indexOf(element)}`],
+                                                                'bg-gray-400 text-gray-200 cursor-not-allowed': uploadingImages[`body_${currentTemplate.bodyElements.indexOf(element)}`]
+                                                            }">
+                                                        <span v-if="!uploadingImages[`body_${currentTemplate.bodyElements.indexOf(element)}`]" class="flex items-center space-x-2">
+                                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                                            </svg>
+                                                            <span>Upload Image</span>
+                                                        </span>
+                                                        <span v-else class="flex items-center space-x-2">
+                                                            <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                            </svg>
+                                                            <span>{{ processingImage ? 'Processing...' : (uploadProgress[`body_${currentTemplate.bodyElements.indexOf(element)}`] || 0) + '%' }}</span>
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                                <button @click="showAiImageModal('body', currentTemplate.bodyElements.indexOf(element))" 
+                                                        :disabled="generatingAiImage"
+                                                        :class="{
+                                                            'px-4 py-2 rounded text-sm font-medium flex items-center space-x-2 transition-colors': true,
+                                                            'bg-green-600 text-white hover:bg-green-700': !generatingAiImage,
+                                                            'bg-gray-400 text-gray-200 cursor-not-allowed': generatingAiImage
+                                                        }">
+                                                    <svg v-if="!generatingAiImage" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                    </svg>
+                                                    <svg v-else class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span>{{ generatingAiImage ? 'Generating...' : 'AI Generate' }}</span>
+                                                </button>
+                                                <button @click="showImageLibraryModal('body', currentTemplate.bodyElements.indexOf(element))" 
+                                                        class="px-4 py-2 rounded text-sm font-medium transition-colors bg-blue-500 text-white hover:bg-blue-600 flex items-center space-x-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                                    </svg>
+                                                    <span>Upload from Library</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Image Preview with Controls -->
+                                        <div v-if="element.url" class="mt-4">
+                                            <div class="relative bg-white rounded-lg p-4 border-2 border-dashed border-gray-300" style="min-height: 220px;">
+                                                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                                    <!-- Image Thumbnail -->
+                                                    <div class="flex-shrink-0">
+                                                        <div class="relative rounded overflow-hidden" style="width: 240px; height: 180px; background: white;">
+                                                            <img :src="element.url" 
+                                                                 :alt="element.alt"
+                                                                 class="absolute inset-0 w-full h-full object-cover">
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <!-- Action Buttons -->
+                                                    <div class="flex flex-wrap gap-2 flex-1 min-w-0">
+                                                        <button @click="removeBodyImage(currentTemplate.bodyElements.indexOf(element))" 
+                                                                class="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
+                                                            Delete
+                                                        </button>
+                                                        <button @click="addToLibrary('body', element.url)" 
+                                                                class="bg-indigo-600 text-white px-3 py-2 rounded text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap">
+                                                            Add to Library
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Button Elements -->
+                                <div v-for="(element, index) in currentTemplate.bodyElements.filter(e => e.type === 'button')" 
+                                     :key="index" 
+                                     class="border rounded-lg p-4 bg-gray-50">
+                                    <div class="flex justify-between items-center mb-3">
+                                        <span class="text-sm font-medium text-gray-700">Button Block</span>
+                                        <button @click="removeBodyElement(currentTemplate.bodyElements.indexOf(element))" 
+                                                class="text-red-500 text-sm hover:text-red-700">
+                                            Remove
+                                        </button>
+                                    </div>
+                                    
+                                    <!-- Validation error for this element -->
+                                    <div v-if="validation.errors[`body_${currentTemplate.bodyElements.indexOf(element)}`]" class="mb-3 p-2 bg-red-50 border border-red-200 rounded">
+                                        <p class="text-sm text-red-600">{{ validation.errors[`body_${currentTemplate.bodyElements.indexOf(element)}`] }}</p>
+                                    </div>
+                                    
+                                    <div class="space-y-3">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Text Above Button</label>
+                                            <input v-model="element.textAbove" 
+                                                   class="w-full border rounded-md px-3 py-2" 
+                                                   placeholder="Enter text to display above the button (optional)">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Button Text</label>
+                                            <input v-model="element.text" 
+                                                   class="w-full border rounded-md px-3 py-2" 
+                                                   placeholder="Enter button text">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-1">Button URL</label>
+                                            <input v-model="element.url" 
+                                                   class="w-full border rounded-md px-3 py-2" 
+                                                   placeholder="Enter button URL">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 mb-2">Button Alignment</label>
+                                            <div class="flex gap-2">
+                                                <button @click="element.alignment = 'left'"
+                                                        :class="{
+                                                            'flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors': true,
+                                                            'bg-indigo-600 text-white shadow-sm': element.alignment === 'left',
+                                                            'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300': element.alignment !== 'left'
+                                                        }"
+                                                        type="button"
+                                                        title="Align button to the left">
+                                                    <span class="flex items-center justify-center space-x-1.5">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18M3 6h18M3 18h18"></path>
+                                                        </svg>
+                                                        <span>Left</span>
+                                                    </span>
+                                                </button>
+                                                <button @click="element.alignment = 'center'"
+                                                        :class="{
+                                                            'flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors': true,
+                                                            'bg-indigo-600 text-white shadow-sm': element.alignment === 'center',
+                                                            'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300': element.alignment !== 'center'
+                                                        }"
+                                                        type="button"
+                                                        title="Center the button">
+                                                    <span class="flex items-center justify-center space-x-1.5">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M6 14h12M3 6h18M3 18h18"></path>
+                                                        </svg>
+                                                        <span>Center</span>
+                                                    </span>
+                                                </button>
+                                                <button @click="element.alignment = 'right'"
+                                                        :class="{
+                                                            'flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors': true,
+                                                            'bg-indigo-600 text-white shadow-sm': element.alignment === 'right',
+                                                            'bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300': element.alignment !== 'right'
+                                                        }"
+                                                        type="button"
+                                                        title="Align button to the right">
+                                                    <span class="flex items-center justify-center space-x-1.5">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M9 14h12M3 6h18M3 18h18"></path>
+                                                        </svg>
+                                                        <span>Right</span>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Empty state for images and buttons -->
+                                <div v-if="!currentTemplate.bodyElements.some(e => e.type === 'image' || e.type === 'button')" 
+                                     class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900">No images or buttons yet</h3>
+                                    <p class="mt-1 text-sm text-gray-500">Add images by uploading, selecting from library, or generating with AI. Add buttons for call-to-action elements.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Footer Section -->
+                    <div class="border rounded-lg p-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium">Footer</h3>
+                            <button @click="showTip('footer')" 
+                                    class="text-blue-600 hover:text-blue-800 p-1 rounded-full hover:bg-blue-50 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- Section description -->
+                        <p class="text-sm text-gray-600 mb-4">Footer area for branding, contact info, and compliance links. The image slot is ideal for logos or simple decorative graphics.</p>
+                        <div class="space-y-4">
+                            <!-- Footer Image and Text Layout -->
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <!-- Footer Image (Left Side) -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Footer Image (Left Side)</label>
+                                    <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-700">
+                                        <strong>Recommended size:</strong> {{ getImageRequirements('footer') }}
+                                        <br><span class="text-blue-600">💡 Best for logos or abstract graphics. Use Footer Text for contact details.</span>
+                                    </div>
+                                    
+                                    <div class="space-y-3">
+                                        <input v-model="currentTemplate.footerImage" 
+                                               class="w-full border rounded-md px-3 py-2" 
+                                               placeholder="Enter image URL">
+                                        <div class="flex flex-wrap" style="gap: 12px !important; margin-bottom: 16px !important;">
+                                            <div class="relative">
+                                                <input type="file" 
+                                                       @change="uploadImage($event, 'footer')" 
+                                                       accept="image/*"
+                                                       :disabled="uploadingImages['footer_main']"
+                                                       class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                                                <button :disabled="uploadingImages['footer_main']"
+                                                        :class="{
+                                                            'px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap': true,
+                                                            'bg-indigo-600 text-white hover:bg-indigo-700': !uploadingImages['footer_main'],
+                                                            'bg-gray-400 text-gray-200 cursor-not-allowed': uploadingImages['footer_main']
+                                                        }">
+                                                    <span v-if="!uploadingImages['footer_main']" class="flex items-center space-x-2">
+                                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                                        </svg>
+                                                        <span>Upload Image</span>
+                                                    </span>
+                                                    <span v-else class="flex items-center space-x-2">
+                                                        <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        <span class="text-sm">{{ processingImage ? 'Processing...' : (uploadProgress['footer_main'] || 0) + '%' }}</span>
+                                                    </span>
+                                                </button>
+                                            </div>
+                                            <button @click="showAiImageModal('footer')" 
+                                                    :disabled="generatingAiImage"
+                                                    :class="{
+                                                        'px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap': true,
+                                                        'bg-green-600 text-white hover:bg-green-700': !generatingAiImage,
+                                                        'bg-gray-400 text-gray-200 cursor-not-allowed': generatingAiImage
+                                                    }">
+                                                <span v-if="!generatingAiImage" class="flex items-center space-x-2">
+                                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                                    </svg>
+                                                    <span>AI Image</span>
+                                                </span>
+                                                <span v-else class="flex items-center space-x-2">
+                                                    <svg class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    <span>Generating...</span>
+                                                </span>
+                                            </button>
+                                            <button @click="showImageLibraryModal('footer')" 
+                                                    class="px-4 py-2 rounded text-sm font-medium transition-colors whitespace-nowrap bg-blue-500 text-white hover:bg-blue-600 flex items-center space-x-2">
+                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                                </svg>
+                                                <span>Upload from Library</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div v-if="currentTemplate.footerImage" class="mt-4">
+                                        <div class="relative bg-gray-100 rounded-lg p-4 border-2 border-dashed border-gray-300" style="min-height: 140px;">
+                                            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                                                <!-- Image Thumbnail -->
+                                                <div class="flex-shrink-0">
+                                                    <div class="relative rounded overflow-hidden" style="width: 300px; height: 100px; background: white;">
+                                                        <img :src="currentTemplate.footerImage" 
+                                                             class="absolute inset-0 w-full h-full object-cover"
+                                                             alt="Footer image preview">
+                                                    </div>
+                                                </div>
+                                                
+                                                <!-- Action Buttons -->
+                                                <div class="flex flex-wrap gap-2 flex-1 min-w-0">
+                                                    <button @click="removeImage('footer')" 
+                                                            class="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
+                                                        Delete
+                                                    </button>
+                                                    <button @click="addToLibrary('footer', currentTemplate.footerImage)" 
+                                                            class="bg-indigo-600 text-white px-3 py-2 rounded text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap">
+                                                        Add to Library
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Footer Text (Right Side) -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Footer Text (Right Side)</label>
+
+                                    <textarea v-model="currentTemplate.footerText" 
+                                              class="w-full border rounded-md px-3 py-2 h-32 resize-none" 
+                                              placeholder="Enter footer text here...&#10;&#10;Examples:&#10;• Contact: info@company.com | Phone: (555) 123-4567&#10;• Follow us on social media: @companyname&#10;• © 2024 Company Name. All rights reserved.&#10;• Address: 123 Main St, City, State 12345"></textarea>
+
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Footer Links</label>
+                                <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded">
+                                    <p class="text-sm text-blue-700 mb-2">
+                                        <strong>Note:</strong> An "Unsubscribe" link will be automatically added to all templates for compliance.
+                                    </p>
+                                </div>
+                                <div v-for="(link, index) in currentTemplate.footerLinks" 
+                                     :key="index" 
+                                     class="space-y-2 mb-4">
+                                    <div class="flex flex-col sm:flex-row gap-2">
+                                        <input v-model="link.text" 
+                                               class="flex-1 border rounded-md px-3 py-2 text-sm" 
+                                               placeholder="Link text">
+                                        <input v-model="link.url" 
+                                               class="flex-1 border rounded-md px-3 py-2 text-sm" 
+                                               placeholder="Link URL">
+                                        <button @click="removeFooterLink(index)" 
+                                                class="bg-red-500 text-white px-3 py-2 rounded text-sm hover:bg-red-600 transition-colors whitespace-nowrap">
+                                            Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex items-center">
+                                    <button @click="addFooterLink" 
+                                            class="text-indigo-600 text-sm hover:text-indigo-800">
+                                        + Add Link
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex flex-wrap justify-end gap-3">
+                    <button @click="cancelEdit" 
+                            class="bg-gray-100 text-gray-700 px-4 py-2 rounded">
+                        Cancel
+                    </button>
+                    <button @click="saveTemplate" 
+                            class="bg-indigo-600 text-white px-4 py-2 rounded">
+                        Save Template
+                    </button>
+                </div>
+            </div>
+
+            <!-- Preview Panel -->
+            <div id="template-preview" class="bg-white shadow rounded-lg p-6">
+                <h3 class="text-lg font-medium mb-4">Preview</h3>
+                <div class="border rounded-lg p-4" v-html="templatePreview"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tip Modal -->
+    <div v-if="isTipModalVisible" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-lg font-medium">{{ tipData.title }}</h3>
+                <button @click="closeTip" class="text-gray-400 hover:text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4">
+                <div class="text-sm text-gray-700 space-y-3">
+                    <div v-for="(tip, index) in tipData.tips" :key="index" class="flex items-start space-x-2">
+                        <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p>{{ tip }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end p-4 border-t">
+                <button @click="closeTip" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                    Got it!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Version History Modal -->
+    <div v-if="isVersionHistoryVisible" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-hidden">
+            <div class="flex justify-between items-center p-6 border-b">
+                <h3 class="text-lg font-medium">Version History - {{ selectedTemplateForHistory?.name }}</h3>
+                <button @click="closeVersionHistory" class="text-gray-400 hover:text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 space-y-4 max-h-96 overflow-y-auto">
+                <div v-for="version in versionHistory" 
+                     :key="version.id"
+                     class="border rounded-lg p-4 hover:bg-gray-50">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-2 mb-2">
+                                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    Version {{ version.version }}
+                                </span>
+                                <span class="text-sm text-gray-500">
+                                    {{ new Date(version.timestamp).toLocaleString() }}
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-700 mb-2">{{ version.changes }}</p>
+                            <p class="text-xs text-gray-500">By: {{ version.author }}</p>
+                        </div>
+                        <button @click="restoreVersion(version)"
+                                class="ml-4 px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
+                            Restore
+                        </button>
+                    </div>
+                </div>
+                
+                <div v-if="versionHistory.length === 0" class="text-center py-8 text-gray-500">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No version history</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Version history will appear here as you make changes to the template.
+                    </p>
+                </div>
+            </div>
+            <div class="flex justify-end p-6 border-t">
+                <button @click="closeVersionHistory"
+                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI HTML Generation Modal -->
+    <div v-if="isAiHtmlModalVisible" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b flex-shrink-0">
+                <h3 class="text-lg font-medium">AI HTML Content Generator</h3>
+                <button @click="closeAiHtmlModal" class="text-gray-400 hover:text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4 overflow-y-auto flex-1" style="max-height: calc(85vh - 140px);">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Describe the content you want</label>
+                    <textarea v-model="aiHtmlPrompt" 
+                              class="w-full border rounded-md px-3 py-2 h-24"
+                              placeholder="e.g., Create a welcome section with a heading, a paragraph about our company's mission, and a call-to-action button for new customers"
+                              :disabled="isGeneratingHtml"></textarea>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Describe what content you want to include. The AI will generate proper HTML with styling.
+                    </p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Content Type</label>
+                        <select v-model="aiHtmlType" 
+                                class="w-full border rounded-md px-3 py-2"
+                                :disabled="isGeneratingHtml">
+                            <option value="welcome">Welcome Section</option>
+                            <option value="announcement">Announcement</option>
+                            <option value="newsletter">Newsletter Content</option>
+                            <option value="promotional">Promotional</option>
+                            <option value="testimonial">Testimonial</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Style</label>
+                        <select v-model="aiHtmlStyle" 
+                                class="w-full border rounded-md px-3 py-2"
+                                :disabled="isGeneratingHtml">
+                            <option value="professional">Professional</option>
+                            <option value="casual">Casual</option>
+                            <option value="modern">Modern</option>
+                            <option value="elegant">Elegant</option>
+                            <option value="bold">Bold</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div v-if="isGeneratingHtml" class="p-4 bg-blue-50 border border-blue-200 rounded">
+                    <div class="flex items-center space-x-3">
+                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-medium text-blue-900">Generating HTML content...</p>
+                            <p class="text-sm text-blue-700">This usually takes 10-20 seconds</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div v-if="generatedHtml" class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Generated HTML Preview</label>
+                        <div class="border rounded-md p-3 bg-gray-50 max-h-64 overflow-y-auto">
+                            <div v-html="generatedHtml"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2">
+                        <button @click="acceptGeneratedHtml" 
+                                class="bg-green-600 text-white px-4 py-2 rounded text-sm hover:bg-green-700 flex items-center space-x-1 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <span>Accept</span>
+                        </button>
+                        <button @click="clearGeneratedHtml" 
+                                class="bg-red-600 text-white px-4 py-2 rounded text-sm hover:bg-red-700 flex items-center space-x-1 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                            </svg>
+                            <span>Clear</span>
+                        </button>
+                        <button @click="regenerateHtml" 
+                                class="bg-blue-600 text-white px-4 py-2 rounded text-sm hover:bg-blue-700 flex items-center space-x-1 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span>Regenerate</span>
+                        </button>
+                    </div>
+                </div>
+                
+                <div v-if="aiHtmlError" class="p-3 bg-red-50 border border-red-200 rounded">
+                    <p class="text-sm text-red-600">{{ aiHtmlError }}</p>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 p-4 border-t flex-shrink-0">
+                <button @click="closeAiHtmlModal"
+                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                    Cancel
+                </button>
+                <button @click="generateHtmlContent"
+                        :disabled="!aiHtmlPrompt.trim() || isGeneratingHtml"
+                        :class="{
+                            'px-4 py-2 rounded font-medium': true,
+                            'bg-indigo-600 text-white hover:bg-indigo-700': aiHtmlPrompt.trim() && !isGeneratingHtml,
+                            'bg-gray-400 text-gray-200 cursor-not-allowed': !aiHtmlPrompt.trim() || isGeneratingHtml
+                        }">
+                    Generate HTML
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Library Modal -->
+    <div v-if="isImageLibraryModalVisible" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b flex-shrink-0">
+                <h3 class="text-lg font-medium">Choose Image from Library - {{ currentImageType }}</h3>
+                <button @click="closeImageLibraryModal" class="text-gray-400 hover:text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <div class="p-4 space-y-4 overflow-y-auto flex-1" style="max-height: calc(90vh - 140px);">
+                <!-- Search and Filter -->
+                <div class="space-y-3">
+                    <div>
+                        <input v-model="imageLibrarySearch" 
+                               type="text" 
+                               placeholder="Search images by name, description, or tags..."
+                               class="w-full border rounded-md px-3 py-2">
+                    </div>
+                    
+                    <div class="flex flex-wrap gap-2">
+                        <button @click="imageLibraryFilter = 'all'"
+                                :class="{
+                                    'px-3 py-1 rounded-full text-sm font-medium': true,
+                                    'bg-indigo-600 text-white': imageLibraryFilter === 'all',
+                                    'bg-gray-200 text-gray-700 hover:bg-gray-300': imageLibraryFilter !== 'all'
+                                }">
+                            All Images
+                        </button>
+                        <button @click="imageLibraryFilter = 'header'"
+                                :class="{
+                                    'px-3 py-1 rounded-full text-sm font-medium': true,
+                                    'bg-indigo-600 text-white': imageLibraryFilter === 'header',
+                                    'bg-gray-200 text-gray-700 hover:bg-gray-300': imageLibraryFilter !== 'header'
+                                }">
+                            Header Images
+                        </button>
+                        <button @click="imageLibraryFilter = 'banner'"
+                                :class="{
+                                    'px-3 py-1 rounded-full text-sm font-medium': true,
+                                    'bg-indigo-600 text-white': imageLibraryFilter === 'banner',
+                                    'bg-gray-200 text-gray-700 hover:bg-gray-300': imageLibraryFilter !== 'banner'
+                                }">
+                            Banner Images
+                        </button>
+                        <button @click="imageLibraryFilter = 'body'"
+                                :class="{
+                                    'px-3 py-1 rounded-full text-sm font-medium': true,
+                                    'bg-indigo-600 text-white': imageLibraryFilter === 'body',
+                                    'bg-gray-200 text-gray-700 hover:bg-gray-300': imageLibraryFilter !== 'body'
+                                }">
+                            Body Images
+                        </button>
+                        <button @click="imageLibraryFilter = 'footer'"
+                                :class="{
+                                    'px-3 py-1 rounded-full text-sm font-medium': true,
+                                    'bg-indigo-600 text-white': imageLibraryFilter === 'footer',
+                                    'bg-gray-200 text-gray-700 hover:bg-gray-300': imageLibraryFilter !== 'footer'
+                                }">
+                            Footer Images
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Loading State -->
+                <div v-if="loadingImageLibrary" class="flex items-center justify-center py-8">
+                    <svg class="animate-spin h-8 w-8 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span class="ml-3 text-gray-600">Loading image library...</span>
+                </div>
+                
+                <!-- Image Grid -->
+                <div v-else-if="filteredImageLibrary.length > 0" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    <div v-for="image in filteredImageLibrary" 
+                         :key="image.id"
+                         class="border rounded-lg p-3 hover:bg-gray-50 transition-colors">
+                        <div class="mb-3 relative bg-gray-100 rounded overflow-hidden" style="aspect-ratio: 16/9; min-height: 120px;">
+                            <img :src="normalizeImageUrl(image.url)" 
+                                 :alt="image.name"
+                                 class="absolute inset-0 w-full h-full object-cover cursor-pointer"
+                                 @click="selectImageFromLibrary(image)"
+                                 @error="handleLibraryImageError($event, image)"
+                                 @load="handleLibraryImageLoad($event, image)"
+                                 :class="{ 'opacity-50': image.loading, 'hidden': image.error }">
+                            
+                            <!-- Loading State -->
+                            <div v-if="image.loading" class="absolute inset-0 flex items-center justify-center bg-gray-100 rounded">
+                                <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-indigo-600"></div>
+                            </div>
+                            
+                            <!-- Error State -->
+                            <div v-if="image.error" class="absolute inset-0 flex items-center justify-center bg-gray-100 rounded">
+                                <div class="text-center p-2">
+                                    <svg class="mx-auto h-6 w-6 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                    </svg>
+                                    <p class="text-xs text-gray-500">Image unavailable</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Action Buttons -->
+                            <div class="absolute top-2 right-2 flex gap-1">
+                                <button @click.stop="downloadImageFromLibrary(image)"
+                                        class="bg-blue-500 text-white rounded-full p-1 hover:bg-blue-600 transition-colors"
+                                        title="Download image">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                                    </svg>
+                                </button>
+                                <button @click.stop="deleteImageFromLibrary(image)"
+                                        class="bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                                        title="Delete image">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <h4 class="font-medium text-sm text-gray-900 truncate">{{ image.name }}</h4>
+                            <p v-if="image.description" class="text-xs text-gray-600 line-clamp-2">{{ image.description }}</p>
+                            <div class="flex flex-wrap gap-1">
+                                <span v-for="tag in image.tags" 
+                                      :key="tag"
+                                      class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                    {{ tag }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- No Results -->
+                <div v-else class="text-center py-8 text-gray-500">
+                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    <h3 class="mt-2 text-sm font-medium text-gray-900">No images found</h3>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Try adjusting your search or filters.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="flex justify-end space-x-3 p-4 border-t flex-shrink-0">
+                <button @click="closeImageLibraryModal"
+                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Image Generation Modal (Two-Stage Process) -->
+    <!-- 
+        This modal uses a simplified flow:
+        1. User describes the STYLE/BACKGROUND they want
+        2. AI generates a text-free image
+        3. Any text is added via HTML overlay (Header Text, Text Blocks, etc.)
+        
+        We intentionally DO NOT offer "bake text into image" as AI often misspells text.
+    -->
+    <div v-if="isAiImageModalVisible" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b flex-shrink-0">
+                <div>
+                    <h3 class="text-lg font-medium">AI Background Generator</h3>
+                    <p class="text-sm text-gray-500 mt-1">
+                        {{ getSlotDisplayName(currentImageType) }} • Recommended: {{ getImageRequirements(currentImageType) }}
+                    </p>
+                </div>
+                <button @click="closeAiImageModal" class="text-gray-400 hover:text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4 overflow-y-auto flex-1" style="max-height: calc(85vh - 140px);">
+                <!-- Key guidance message -->
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <div class="flex items-start space-x-2">
+                        <svg class="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div class="text-sm text-amber-800">
+                            <strong>Best practice:</strong> Describe the <em>background design</em> you want. 
+                            For any text (titles, slogans, calls-to-action), use the text fields in your template—this ensures perfect spelling and easy editing.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Style description input -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Describe the background style</label>
+                    <textarea v-model="aiImagePrompt" 
+                              class="w-full border rounded-md px-3 py-2 h-28"
+                              :placeholder="getSlotStylePlaceholder(currentImageType)"
+                              :disabled="isGeneratingImage"></textarea>
+                    <p class="mt-1 text-sm text-gray-500">
+                        Focus on colors, mood, and visual elements. The AI will create a clean background without text.
+                    </p>
+                </div>
+                
+                <!-- Style preset selector -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Visual Style</label>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <button v-for="styleOption in ['realistic', 'artistic', 'minimalist', 'vintage', 'modern']"
+                                :key="styleOption"
+                                @click="aiImageStyle = styleOption"
+                                :disabled="isGeneratingImage"
+                                type="button"
+                                :class="{
+                                    'px-3 py-2 rounded-md text-sm font-medium border transition-colors': true,
+                                    'bg-indigo-600 text-white border-indigo-600': aiImageStyle === styleOption,
+                                    'bg-white text-gray-700 border-gray-300 hover:bg-gray-50': aiImageStyle !== styleOption,
+                                    'opacity-50 cursor-not-allowed': isGeneratingImage
+                                }">
+                            {{ styleOption.charAt(0).toUpperCase() + styleOption.slice(1) }}
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Generation progress -->
+                <div v-if="isGeneratingImage" class="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div class="flex items-center space-x-3">
+                        <svg class="animate-spin h-5 w-5 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-medium text-blue-900">Creating your background image...</p>
+                            <p class="text-sm text-blue-700">Our AI is crafting a text-free design. This takes 15-30 seconds.</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Generated image preview -->
+                <div v-if="generatedImageUrl" class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Generated Background</label>
+                        <div class="border rounded-md p-3 bg-gray-50">
+                            <div v-if="imageLoading" class="flex items-center justify-center h-32">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                                <span class="ml-2 text-sm text-gray-600">Loading preview...</span>
+                            </div>
+                            <div v-else class="relative overflow-hidden rounded" :style="getGeneratedImageContainerStyle()">
+                                <img :src="generatedImageUrl" 
+                                     class="w-full h-full object-cover"
+                                     alt="Generated background"
+                                     @error="handleGeneratedImageError"
+                                     @load="handleImageLoad($event, 'generated')">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p class="text-sm text-green-700">
+                            <strong>✓ Background ready!</strong> Add it to your template, then use the text fields (Header Text, Text Blocks, etc.) for any wording you need.
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Error display -->
+                <div v-if="aiImageError" class="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div class="flex items-start space-x-2">
+                        <svg class="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <p class="text-sm text-red-600">{{ aiImageError }}</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Footer with action buttons - always visible -->
+            <div class="border-t bg-gray-50 p-4 flex-shrink-0">
+                <!-- Action buttons when image is generated -->
+                <div v-if="generatedImageUrl" class="flex flex-wrap gap-2 mb-3">
+                    <button @click="acceptGeneratedImage" 
+                            type="button"
+                            style="background-color: #16a34a; color: white;"
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-medium hover:opacity-90">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                        Use This Background
+                    </button>
+                    <button @click="saveToLibrary" 
+                            type="button"
+                            style="background-color: #4f46e5; color: white;"
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-medium hover:opacity-90">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"></path>
+                        </svg>
+                        Save to Library
+                    </button>
+                    <button @click="clearGeneratedImage" 
+                            type="button"
+                            style="background-color: #d1d5db; color: #374151;"
+                            class="inline-flex items-center justify-center gap-2 px-4 py-2 rounded text-sm font-medium hover:opacity-90">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                        Clear
+                    </button>
+                </div>
+                
+                <!-- Primary actions row -->
+                <div class="flex justify-between items-center">
+                    <button @click="closeAiImageModal"
+                            type="button"
+                            class="px-4 py-2 bg-gray-200 text-gray-700 rounded font-medium hover:bg-gray-300">
+                        Cancel
+                    </button>
+                    <button @click="generateSlotImage"
+                            type="button"
+                            :disabled="!aiImagePrompt.trim() || isGeneratingImage"
+                            class="inline-flex items-center justify-center gap-2 px-6 py-2 rounded font-medium bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed">
+                        <svg v-if="!isGeneratingImage" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                        </svg>
+                        <svg v-else class="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        {{ generatedImageUrl ? 'Regenerate' : 'Generate Background' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Daily Limit Modal -->
+    <div v-if="isDailyLimitModalVisible" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div class="flex items-center space-x-4 mb-4">
+                <!-- Warning Icon -->
+                <div class="flex-shrink-0">
+                    <svg class="h-12 w-12 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
+                    </svg>
+                </div>
+                
+                <!-- Content -->
+                <div class="flex-1">
+                    <h3 class="text-lg font-semibold text-gray-900 mb-2">
+                        Daily Limit Reached
+                    </h3>
+                    <p class="text-sm text-gray-600 mb-3">
+                        {{ dailyLimitError?.message || 'You have reached your daily maximum of 25 AI image generations.' }}
+                    </p>
+                    
+                    <!-- Usage Stats -->
+                    <div v-if="dailyLimitError" class="bg-gray-50 rounded-lg p-3 mb-4">
+                        <div class="flex justify-between items-center text-sm">
+                            <span class="text-gray-600">Images generated today:</span>
+                            <span class="font-semibold text-gray-900">
+                                {{ dailyLimitError.currentCount }} / {{ dailyLimitError.maxLimit }}
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2 mt-2">
+                            <div class="bg-orange-500 h-2 rounded-full" 
+                                 :style="{ width: (dailyLimitError.currentCount / dailyLimitError.maxLimit * 100) + '%' }">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-xs text-gray-500">
+                        Your limit will reset tomorrow. You can still use uploaded images or images from your library.
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Actions -->
+            <div class="flex justify-end space-x-3">
+                <button @click="closeDailyLimitModal" 
+                        class="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400 transition-colors">
+                    Got it
+                </button>
+                <button @click="openImageLibraryModal" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors">
+                    Browse Library
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue
+
+createApp({
+    data() {
+        return {
+            templates: [],
+            editingTemplate: false,
+            currentTemplate: null,
+            defaultTemplate: {
+                id: 'default',
+                name: 'Basic Marketing Template',
+                headerText: 'Campaign Builder',
+                headerTextStyle: {
+                    fontSize: 'text-2xl',
+                    bold: true,
+                    italic: false,
+                    align: 'center'
+                },
+                headerImage: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2074&q=80',
+                bannerImage: '',
+                category: 'marketing',
+                tags: ['newsletter', 'promotional'],
+                bodyElements: [
+                    {
+                        type: 'text',
+                        content: 'Thank you for being a valued customer. We appreciate your business.'
+                    },
+                    {
+                        type: 'button',
+                        textAbove: '',
+                        text: 'Visit Our Website',
+                        url: 'https://swiftmedia.ca',
+                        alignment: 'left'
+                    }
+                ],
+                footerImage: '',
+                footerText: 'Contact: info@campaignbuilder.com | Phone: (555) 123-4567\nFollow us: @campaignbuilder\n© 2024 Campaign Builder. All rights reserved.',
+                footerLinks: [
+                    {
+                        text: 'Privacy Policy',
+                        url: '#'
+                    },
+                    {
+                        text: 'Contact Us',
+                        url: '#'
+                    }
+                ],
+                style: {
+                    headerOverlay: 'bg-gradient-to-r from-indigo-900 to-indigo-600 mix-blend-multiply',
+                    headerTextColor: 'text-white'
+                },
+                updatedAt: new Date().toISOString()
+            },
+            isGenerating: false,
+            isLoading: false,
+            generateTopic: '',
+            generateTone: 'professional',
+            generatePrompt: `Create an email template with HTML formatting. Include:
+- A compelling headline
+- Formatted paragraphs with <p> tags
+- At least one call-to-action button
+- Basic styling using inline CSS
+The content should be marketing-focused and professional.`,
+            // Validation system
+            validation: {
+                errors: {},
+                isValid: true
+            },
+            // Tag management
+            showTagInput: false,
+            newTag: '',
+            // Search and filtering
+            searchQuery: '',
+            selectedCategory: 'all',
+            selectedTags: [],
+            availableTags: [],
+            // Versioning system
+            isVersionHistoryVisible: false,
+            selectedTemplateForHistory: null,
+            versionHistory: [],
+            // Upload progress
+            uploadProgress: {},
+            uploadingImages: {},
+            // AI HTML generation
+            isAiHtmlModalVisible: false,
+            aiHtmlPrompt: '',
+            aiHtmlType: 'welcome',
+            aiHtmlStyle: 'professional',
+            isGeneratingHtml: false,
+            generatedHtml: '',
+            aiHtmlError: '',
+            generatingAiImage: false,
+            // AI Image generation (two-stage process - background only, no text baking)
+            // NOTE: Text is NEVER baked into AI images. Users must use text blocks in the template editor.
+            isAiImageModalVisible: false,
+            aiImagePrompt: '',
+            aiImageStyle: 'realistic',
+            aiImageSize: '1024x1024',
+            isGeneratingImage: false,
+            generatedImageUrl: '',
+            imageLoading: false,
+            aiImageError: '',
+            currentImageType: null,
+            currentImageIndex: null,
+            // Toast notifications
+            toast: {
+                show: false,
+                message: '',
+                type: 'info'
+            },
+            // Tip system
+            isTipModalVisible: false,
+            tipData: {
+                title: '',
+                tips: []
+            },
+            // Automatic Image Sizing Configuration
+            imageSizingConfig: (typeof ImageConfig !== 'undefined' && ImageConfig.sizing) ? ImageConfig.sizing : {
+                header: { width: 1200, height: 400, aspectRatio: 3, cropMode: 'cover' },
+                banner: { width: 1200, height: 300, aspectRatio: 4, cropMode: 'cover' },
+                body: { width: 800, height: 600, aspectRatio: 1.33, cropMode: 'contain' },
+                footer: { width: 600, height: 200, aspectRatio: 3, cropMode: 'contain' }
+            },
+            // Image processing state
+            processingImage: false,
+            // Image fit mode - always use contain (fit entire image)
+            imageFitMode: 'contain',
+            // Image display modes for each section
+            imageModes: {
+                header: 'cover',
+                banner: 'cover', 
+                body: 'cover',
+                footer: 'cover'
+            },
+            // Image Library Modal
+            isImageLibraryModalVisible: false,
+            imageLibrarySearch: '',
+            imageLibraryFilter: 'all',
+            loadingImageLibrary: false,
+            imageLibrary: [],
+            // Daily limit modal
+            isDailyLimitModalVisible: false,
+            dailyLimitError: null
+        }
+    },
+    computed: {
+        templatePreview() {
+            let preview = '';
+            // Header
+            if (this.currentTemplate.headerImage || this.currentTemplate.headerText) {
+                const headerMode = this.imageModes.header || 'cover';
+                const headerConfig = this.imageSizingConfig.header;
+                // Build header text style classes and inline styles
+                const headerStyle = this.currentTemplate.headerTextStyle || { fontSize: 'text-2xl', bold: true, italic: false, align: 'center' };
+                const fontSizeClass = headerStyle.fontSize || 'text-2xl';
+                const alignClass = headerStyle.align === 'left' ? 'text-left justify-start' : headerStyle.align === 'right' ? 'text-right justify-end' : 'text-center justify-center';
+                // Use inline styles for bold and italic to ensure they apply
+                const fontWeight = headerStyle.bold ? 'font-weight: bold;' : 'font-weight: normal;';
+                const fontStyleCss = headerStyle.italic ? 'font-style: italic;' : 'font-style: normal;';
+                preview += `
+                    <div class="relative w-full" style="min-height: 200px; height: 200px; max-width: 100%;">
+                        <img src="${this.currentTemplate.headerImage}" class="w-full h-full object-cover" style="width: 100% !important; height: 100% !important; min-height: 200px !important;">
+                        ${this.currentTemplate.headerText ? `
+                        <div class="absolute inset-0 bg-black bg-opacity-40 flex items-center ${alignClass} p-4">
+                            <h1 class="text-white ${fontSizeClass} leading-tight" style="${fontWeight} ${fontStyleCss}">${this.currentTemplate.headerText}</h1>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+            }
+            // Banner
+            if (this.currentTemplate.bannerImage) {
+                const bannerMode = this.imageModes.banner || 'cover';
+                const bannerConfig = this.imageSizingConfig.banner;
+                preview += `
+                    <div class="my-4 w-full" style="aspect-ratio: ${bannerConfig.width}/${bannerConfig.height}; max-width: 100%;">
+                        <img src="${this.currentTemplate.bannerImage}" class="w-full h-full object-cover">
+                    </div>
+                `;
+            }
+            // Body
+            preview += '<div class="space-y-4 my-4">';
+            this.currentTemplate.bodyElements.forEach(element => {
+                switch (element.type) {
+                    case 'text':
+                        // Check if content contains HTML tags
+                        if (element.content.includes('<') && element.content.includes('>')) {
+                            // Render HTML content directly with margin and proper heading spacing
+                            let styledContent = element.content;
+                            // Add spacing to headings
+                            styledContent = styledContent.replace(/<h([1-6])>/g, '<h$1 class="mt-6 mb-2">');
+                            styledContent = styledContent.replace(/<h([1-6])\s+([^>]*)>/g, '<h$1 class="mt-6 mb-2" $2>');
+                            preview += `<div class="mb-4">${styledContent}</div>`;
+                        } else {
+                            // Render plain text wrapped in p tag
+                            preview += `<p class="mb-4">${element.content}</p>`;
+                        }
+                        break;
+                    case 'button':
+                        const alignmentClass = element.alignment === 'center' ? 'text-center' : 
+                                               element.alignment === 'right' ? 'text-right' : 'text-left';
+                        preview += `
+                            <div class="mb-4 ${alignmentClass}">
+                                ${element.textAbove ? `<p class="mb-2 text-gray-700">${element.textAbove}</p>` : ''}
+                                <a href="${element.url}" class="inline-block bg-indigo-600 text-white px-6 py-2 rounded">
+                                    ${element.text}
+                                </a>
+                            </div>
+                        `;
+                        break;
+                    case 'image':
+                        const bodyConfig = this.imageSizingConfig.body;
+                        preview += `<div class="w-full mb-4" style="aspect-ratio: ${bodyConfig.width}/${bodyConfig.height}; max-width: 100%;"><img src="${element.url}" alt="${element.alt}" class="w-full h-full object-cover"></div>`;
+                        break;
+                }
+            });
+            preview += '</div>';
+            // Footer
+            if (this.currentTemplate.footerImage || this.currentTemplate.footerText || this.currentTemplate.footerLinks.length > 0) {
+                const footerConfig = this.imageSizingConfig.footer;
+                preview += '<div class="border-t pt-4">';
+                
+                // Footer content in side-by-side layout
+                if (this.currentTemplate.footerImage || this.currentTemplate.footerText) {
+                    preview += '<div class="flex flex-row gap-6 items-start" style="min-height: 100px; display: flex !important; flex-direction: row !important;">';
+                    
+                    // Footer Image (Left Side)
+                    if (this.currentTemplate.footerImage) {
+                        preview += `<div class="flex-shrink-0" style="width: 300px; min-width: 300px; flex-shrink: 0 !important;"><img src="${this.currentTemplate.footerImage}" class="w-full h-full object-cover rounded"></div>`;
+                    }
+                    
+                    // Footer Text (Right Side)
+                    if (this.currentTemplate.footerText) {
+                        preview += `<div class="flex-1 text-gray-600 min-w-0" style="flex: 1 !important;"><div style="white-space: pre-line;">${this.currentTemplate.footerText}</div></div>`;
+                    }
+                    
+                    preview += '</div>';
+                }
+                
+                // Footer Links (Below)
+                if (this.currentTemplate.footerLinks.length > 0) {
+                    preview += '<div class="flex flex-col sm:flex-row justify-center items-center space-y-2 sm:space-y-0 sm:space-x-4 mt-4">';
+                    this.currentTemplate.footerLinks.forEach(link => {
+                        preview += `
+                            <a href="${link.url}" class="text-indigo-600 hover:text-indigo-800 text-sm sm:text-base">
+                                ${link.text}
+                            </a>
+                        `;
+                    });
+                    preview += '</div>';
+                }
+                preview += '</div>';
+            }
+            // Always add unsubscribe link for compliance
+            preview += '<div class="border-t pt-4 mt-4">';
+            preview += '<div class="text-center text-sm text-gray-500">';
+            preview += '<p>This email was sent to you because you subscribed to our newsletter.</p>';
+            preview += '<p class="mt-1">';
+            preview += '<a href="{{unsubscribe_url}}" class="text-red-600 hover:text-red-800 underline">Unsubscribe</a> | ';
+            preview += '<a href="{{preferences_url}}" class="text-indigo-600 hover:text-indigo-800 underline">Update Preferences</a>';
+            preview += '</p>';
+            preview += '</div>';
+            preview += '</div>';
+            return preview;
+        },
+        
+        // Filtered templates based on search and filters
+        filteredTemplates() {
+            let filtered = this.templates;
+            
+            // Exclude the default template from the filtered list since it's shown separately
+            filtered = filtered.filter(template => 
+                template.id !== 'default' && !template.isDefault
+            );
+            
+            // Search by name
+            if (this.searchQuery.trim()) {
+                const query = this.searchQuery.toLowerCase();
+                filtered = filtered.filter(template => 
+                    template.name.toLowerCase().includes(query) ||
+                    template.headerText?.toLowerCase().includes(query) ||
+                    template.tags?.some(tag => tag.toLowerCase().includes(query))
+                );
+            }
+            
+            // Filter by category
+            if (this.selectedCategory !== 'all') {
+                filtered = filtered.filter(template => 
+                    template.category === this.selectedCategory
+                );
+            }
+            
+            // Filter by tags
+            if (this.selectedTags.length > 0) {
+                filtered = filtered.filter(template => 
+                    template.tags && this.selectedTags.every(selectedTag => 
+                        template.tags.includes(selectedTag)
+                    )
+                );
+            }
+            
+            return filtered;
+        },
+        
+        // Available categories from templates
+        availableCategories() {
+            const categories = new Set();
+            this.templates.forEach(template => {
+                if (template.category) {
+                    categories.add(template.category);
+                }
+            });
+            return Array.from(categories).sort();
+        },
+        
+        // Available tags from templates
+        availableTagsList() {
+            const tags = new Set();
+            this.templates.forEach(template => {
+                if (template.tags) {
+                    template.tags.forEach(tag => tags.add(tag));
+                }
+            });
+            return Array.from(tags).sort();
+        },
+        
+        // Filtered image library based on search and filter
+        filteredImageLibrary() {
+            let filtered = this.imageLibrary;
+            
+            // Filter by section
+            if (this.imageLibraryFilter !== 'all') {
+                filtered = filtered.filter(image => image.section === this.imageLibraryFilter);
+            }
+            
+            // Search by name, description, or tags
+            if (this.imageLibrarySearch.trim()) {
+                const query = this.imageLibrarySearch.toLowerCase();
+                filtered = filtered.filter(image => 
+                    image.name.toLowerCase().includes(query) ||
+                    image.description?.toLowerCase().includes(query) ||
+                    image.tags?.some(tag => tag.toLowerCase().includes(query))
+                );
+            }
+            
+            return filtered;
+        }
+    },
+    methods: {
+        // Image handling methods
+        normalizeImageUrl(url) {
+            // Fallback implementation
+            if (!url) {
+                return '';
+            }
+            
+            // If it's already a full URL (starts with http/https), return as is
+            if (url.startsWith('http://') || url.startsWith('https://')) {
+                return url;
+            }
+            
+            // If it's a relative URL (starts with /), make it absolute
+            if (url.startsWith('/')) {
+                const result = window.location.origin + url;
+                return result;
+            }
+            
+            // If it's a relative URL without leading slash, add it
+            if (!url.startsWith('/')) {
+                const result = window.location.origin + '/' + url;
+                return result;
+            }
+            
+            return url;
+        },
+        
+        // Image Library Methods
+        async showImageLibraryModal(type, index = null) {
+            this.currentImageType = type;
+            this.currentImageIndex = index;
+            this.isImageLibraryModalVisible = true;
+            this.imageLibrarySearch = '';
+            this.imageLibraryFilter = 'all';
+            await this.loadImageLibrary();
+        },
+        
+        closeImageLibraryModal() {
+            this.isImageLibraryModalVisible = false;
+            this.imageLibrarySearch = '';
+            this.imageLibraryFilter = 'all';
+            this.imageLibrary = [];
+        },
+        
+        async loadImageLibrary() {
+            this.loadingImageLibrary = true;
+            try {
+                const response = await API.get('/api/images');
+                this.imageLibrary = response.images || response || [];
+                
+                // Initialize image loading states
+                this.imageLibrary.forEach(image => {
+                    image.loading = true;
+                    image.error = false;
+                });
+            } catch (error) {
+                console.error('Failed to load image library:', error);
+                this.showToast('Failed to load image library: ' + error.message, 'error');
+                this.imageLibrary = [];
+            } finally {
+                this.loadingImageLibrary = false;
+            }
+        },
+        
+        // Handle image library image errors
+        handleLibraryImageError(event, image) {
+            image.error = true;
+            image.loading = false;
+        },
+        
+        // Handle successful library image load
+        handleLibraryImageLoad(event, image) {
+            image.loading = false;
+            image.error = false;
+        },
+        
+        selectImageFromLibrary(image) {
+            // Set the selected image to the appropriate field based on type
+            if (this.currentImageType === 'header') {
+                this.currentTemplate.headerImage = image.url;
+            } else if (this.currentImageType === 'banner') {
+                this.currentTemplate.bannerImage = image.url;
+            } else if (this.currentImageType === 'footer') {
+                this.currentTemplate.footerImage = image.url;
+            } else if (this.currentImageType === 'body' && this.currentImageIndex !== null) {
+                // Update existing body image element
+                this.currentTemplate.bodyElements[this.currentImageIndex].url = image.url;
+                this.currentTemplate.bodyElements[this.currentImageIndex].alt = image.name;
+            } else if (this.currentImageType === 'body') {
+                // Add as a new body image element
+                this.currentTemplate.bodyElements.push({
+                    type: 'image',
+                    url: image.url,
+                    alt: image.name
+                });
+            }
+            
+            this.closeImageLibraryModal();
+            this.showToast(`Image "${image.name}" selected from library!`, 'success');
+        },
+
+        async deleteImageFromLibrary(image) {
+            if (!confirm(`Are you sure you want to delete "${image.name}" from your image library?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/images/${image.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    // Remove the image from the local array
+                    const index = this.imageLibrary.findIndex(img => img.id === image.id);
+                    if (index !== -1) {
+                        this.imageLibrary.splice(index, 1);
+                    }
+                    this.showToast(`Image "${image.name}" deleted successfully!`, 'success');
+                } else {
+                    throw new Error('Failed to delete image');
+                }
+            } catch (error) {
+                this.showToast('Failed to delete image: ' + error.message, 'error');
+            }
+        },
+
+        async downloadImageFromLibrary(image) {
+            try {
+                this.showToast('Preparing download...', 'info');
+                
+                // Use server-side download endpoint to handle CORS and file serving
+                const token = localStorage.getItem('token');
+                const response = await fetch(`/api/images/${image.id}/download`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to download image');
+                }
+                
+                // Get the blob from response
+                const blob = await response.blob();
+                
+                // Get filename from Content-Disposition header or use image name
+                const contentDisposition = response.headers.get('Content-Disposition');
+                let filename = image.name || 'image';
+                
+                if (contentDisposition) {
+                    const filenameMatch = contentDisposition.match(/filename="?(.+?)"?$/);
+                    if (filenameMatch) {
+                        filename = filenameMatch[1];
+                    }
+                } else {
+                    // Fallback: construct filename from image name and extension
+                    const imageUrl = this.normalizeImageUrl(image.url);
+                    try {
+                        const urlPath = new URL(imageUrl).pathname;
+                        const extension = urlPath.match(/\.(jpg|jpeg|png|gif|webp|svg)$/i)?.[0] || '.jpg';
+                        filename = (image.name || 'image').replace(/[^a-z0-9]/gi, '_').toLowerCase() + extension;
+                    } catch (e) {
+                        // If URL parsing fails, use default
+                        filename = (image.name || 'image').replace(/[^a-z0-9]/gi, '_').toLowerCase() + '.jpg';
+                    }
+                }
+                
+                // Create a download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                
+                // Trigger download
+                document.body.appendChild(link);
+                link.click();
+                
+                // Cleanup
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                }, 100);
+                
+                this.showToast(`Image "${image.name}" downloaded successfully!`, 'success');
+            } catch (error) {
+                console.error('Download error:', error);
+                this.showToast('Failed to download image: ' + error.message, 'error');
+            }
+        },
+
+        // Template management methods
+        async loadTemplates() {
+            try {
+                const token = localStorage.getItem('token');
+                const headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const response = await fetch('/api/templates', {
+                    credentials: 'include',
+                    headers
+                });
+
+                if (response.status === 401) {
+                    if (window.redirectToLogin) window.redirectToLogin('no_token', { from: 'templates' });
+                    else window.location.replace('/login?loop=1&reason=no_token&from=templates');
+                    return;
+                }
+                if (response.ok) {
+                    this.templates = await response.json();
+                } else {
+                    throw new Error('Failed to load templates');
+                }
+            } catch (error) {
+                this.showToast('Failed to load templates: ' + error.message, 'error');
+            }
+        },
+
+        async saveTemplate(closeEditor = true) {
+            if (!this.currentTemplate.name.trim()) {
+                this.showToast('Please enter a template name', 'error');
+                return;
+            }
+
+            try {
+                const method = this.currentTemplate.id ? 'PUT' : 'POST';
+                const url = this.currentTemplate.id 
+                    ? `/api/templates/${this.currentTemplate.id}`
+                    : '/api/templates';
+
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(this.currentTemplate)
+                });
+
+                if (response.ok) {
+                    const savedTemplate = await response.json();
+                    
+                    // Update the templates array
+                    const index = this.templates.findIndex(t => t.id === savedTemplate.id);
+                    if (index !== -1) {
+                        this.templates[index] = savedTemplate;
+                    } else {
+                        this.templates.unshift(savedTemplate);
+                    }
+                    
+                    this.currentTemplate = savedTemplate;
+                    this.showToast('Template saved successfully!', 'success');
+                    
+                    // Only close the editor if explicitly requested
+                    if (closeEditor) {
+                        this.editingTemplate = false;
+                    }
+                } else {
+                    throw new Error('Failed to save template');
+                }
+            } catch (error) {
+                this.showToast('Failed to save template: ' + error.message, 'error');
+            }
+        },
+
+        async deleteTemplate(id) {
+            if (!confirm('Are you sure you want to delete this template?')) return;
+
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    throw new Error('No authentication token found. Please log in again.');
+                }
+
+                const response = await fetch(`/api/templates/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    this.templates = this.templates.filter(t => t.id !== id);
+                    this.showToast('Template deleted successfully!', 'success');
+                    
+                    // If we're editing the deleted template, close the editor
+                    if (this.currentTemplate && this.currentTemplate.id === id) {
+                        this.editingTemplate = false;
+                        this.currentTemplate = null;
+                    }
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `Server responded with status ${response.status}`);
+                }
+            } catch (error) {
+                this.showToast('Failed to delete template: ' + error.message, 'error');
+            }
+        },
+
+        async cloneTemplate(templateToClone) {
+            const newTemplate = {
+                ...JSON.parse(JSON.stringify(templateToClone)), // Deep clone
+                id: null, // Let the backend generate the ID
+                name: `${templateToClone.name} Copy`
+            };
+            // Ensure headerTextStyle exists
+            if (!newTemplate.headerTextStyle) {
+                newTemplate.headerTextStyle = {
+                    fontSize: 'text-2xl',
+                    bold: true,
+                    italic: false,
+                    align: 'center'
+                };
+            }
+            if (!newTemplate.headerTextStyle.align) {
+                newTemplate.headerTextStyle.align = 'center';
+            }
+
+            try {
+                const response = await fetch('/api/templates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(newTemplate)
+                });
+
+                if (response.ok) {
+                    const savedTemplate = await response.json();
+                    this.templates.unshift(savedTemplate);
+                    this.showToast('Template cloned successfully!', 'success');
+                } else {
+                    throw new Error('Failed to clone template');
+                }
+            } catch (error) {
+                this.showToast('Failed to clone template: ' + error.message, 'error');
+            }
+        },
+
+        async saveAsNewTemplate(templateToClone) {
+            const newTemplate = {
+                ...JSON.parse(JSON.stringify(templateToClone)), // Deep clone
+                id: null, // Let the backend generate the ID
+                name: `${templateToClone.name} Copy`
+            };
+            // Ensure headerTextStyle exists
+            if (!newTemplate.headerTextStyle) {
+                newTemplate.headerTextStyle = {
+                    fontSize: 'text-2xl',
+                    bold: true,
+                    italic: false,
+                    align: 'center'
+                };
+            }
+            if (!newTemplate.headerTextStyle.align) {
+                newTemplate.headerTextStyle.align = 'center';
+            }
+
+            try {
+                const response = await fetch('/api/templates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(newTemplate)
+                });
+
+                if (response.ok) {
+                    const savedTemplate = await response.json();
+                    this.templates.unshift(savedTemplate);
+                    this.showToast('Template saved as new template successfully!', 'success');
+                } else {
+                    throw new Error('Failed to save template');
+                }
+            } catch (error) {
+                this.showToast('Failed to save template: ' + error.message, 'error');
+            }
+        },
+
+        editTemplate(template) {
+            this.currentTemplate = JSON.parse(JSON.stringify(template)); // Deep clone
+            // Ensure headerTextStyle exists for older templates
+            if (!this.currentTemplate.headerTextStyle) {
+                this.currentTemplate.headerTextStyle = {
+                    fontSize: 'text-2xl',
+                    bold: true,
+                    italic: false,
+                    align: 'center'
+                };
+            }
+            // Ensure align exists for templates created before this feature
+            if (!this.currentTemplate.headerTextStyle.align) {
+                this.currentTemplate.headerTextStyle.align = 'center';
+            }
+            this.editingTemplate = true;
+        },
+
+        createNewTemplate() {
+            this.currentTemplate = {
+                id: null,
+                name: '',
+                headerImage: '',
+                headerText: '',
+                headerTextStyle: {
+                    fontSize: 'text-2xl',
+                    bold: true,
+                    italic: false,
+                    align: 'center'
+                },
+                bannerImage: '',
+                category: 'marketing',
+                tags: [],
+                bodyElements: [],
+                footerImage: '',
+                footerText: '',
+                footerLinks: [],
+                style: {
+                    headerOverlay: 'bg-gradient-to-r from-indigo-900 to-indigo-600 mix-blend-multiply',
+                    headerTextColor: 'text-white'
+                }
+            };
+            this.editingTemplate = true;
+        },
+
+        cancelEdit() {
+            this.editingTemplate = false;
+            this.currentTemplate = null;
+        },
+
+        // Toast notification method
+        showToast(message, type = 'info') {
+            this.toast = {
+                show: true,
+                message: message,
+                type: type
+            };
+            
+            setTimeout(() => {
+                this.toast.show = false;
+            }, 5000);
+        },
+
+        showDailyLimitPopup(error) {
+            this.dailyLimitError = error;
+            this.isDailyLimitModalVisible = true;
+        },
+
+        closeDailyLimitModal() {
+            this.isDailyLimitModalVisible = false;
+            this.dailyLimitError = null;
+        },
+
+        // Body element management
+        addBodyElement(type) {
+            const newElement = {
+                type: type,
+                showPreview: false
+            };
+
+            if (type === 'text') {
+                newElement.content = '';
+            } else if (type === 'button') {
+                newElement.textAbove = '';
+                newElement.text = '';
+                newElement.url = '';
+                newElement.alignment = 'left'; // Default to left alignment
+            } else if (type === 'image') {
+                newElement.url = '';
+                newElement.alt = '';
+            }
+
+            this.currentTemplate.bodyElements.push(newElement);
+        },
+
+        removeBodyElement(index) {
+            this.currentTemplate.bodyElements.splice(index, 1);
+        },
+
+        removeBodyImage(index) {
+            this.currentTemplate.bodyElements.splice(index, 1);
+        },
+
+        // Footer link management
+        addFooterLink() {
+            this.currentTemplate.footerLinks.push({ text: '', url: '' });
+        },
+
+        removeFooterLink(index) {
+            this.currentTemplate.footerLinks.splice(index, 1);
+        },
+
+        // Image upload handling
+        async uploadImage(event, type, index = null) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            try {
+                const response = await fetch('/api/templates/upload-image', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const { url } = await response.json();
+                    
+                    // Prepend the base URL if it's a relative path
+                    const fullUrl = url.startsWith('/') ? `https://campaignbuilder.ca${url}` : url;
+
+                    switch (type) {
+                        case 'header':
+                            this.currentTemplate.headerImage = fullUrl;
+                            break;
+                        case 'banner':
+                            this.currentTemplate.bannerImage = fullUrl;
+                            break;
+                        case 'footer':
+                            this.currentTemplate.footerImage = fullUrl;
+                            break;
+                        case 'body':
+                            if (index !== null) {
+                                this.currentTemplate.bodyElements[index].url = fullUrl;
+                                this.currentTemplate.bodyElements[index].alt = file.name;
+                            }
+                            break;
+                    }
+                    
+                    this.showToast('Image uploaded successfully!', 'success');
+                } else {
+                    throw new Error('Upload failed');
+                }
+            } catch (error) {
+                this.showToast('Failed to upload image: ' + error.message, 'error');
+            }
+        },
+
+        // Image removal
+        removeImage(type) {
+            switch (type) {
+                case 'header':
+                    this.currentTemplate.headerImage = '';
+                    break;
+                case 'banner':
+                    this.currentTemplate.bannerImage = '';
+                    break;
+                case 'footer':
+                    this.currentTemplate.footerImage = '';
+                    break;
+            }
+        },
+
+        // Tag management
+        addTag() {
+            if (this.newTag.trim() && !this.currentTemplate.tags.includes(this.newTag.trim())) {
+                this.currentTemplate.tags.push(this.newTag.trim());
+                this.newTag = '';
+            }
+        },
+
+        removeTag(tag) {
+            const index = this.currentTemplate.tags.indexOf(tag);
+            if (index > -1) {
+                this.currentTemplate.tags.splice(index, 1);
+            }
+        },
+
+        // Toggle italic style for header text
+        toggleItalic() {
+            this.currentTemplate.headerTextStyle.italic = !this.currentTemplate.headerTextStyle.italic;
+        },
+
+        isTagSelected(tag) {
+            return this.selectedTags.includes(tag);
+        },
+
+        toggleTag(tag) {
+            const index = this.selectedTags.indexOf(tag);
+            if (index > -1) {
+                this.selectedTags.splice(index, 1);
+            } else {
+                this.selectedTags.push(tag);
+            }
+        },
+
+        // Search and filter
+        clearFilters() {
+            this.searchQuery = '';
+            this.selectedCategory = 'all';
+            this.selectedTags = [];
+        },
+
+        clearSearch() {
+            this.searchQuery = '';
+            this.selectedCategory = 'all';
+            this.selectedTags = [];
+        },
+
+        toggleTagFilter(tag) {
+            const index = this.selectedTags.indexOf(tag);
+            if (index > -1) {
+                this.selectedTags.splice(index, 1);
+            } else {
+                this.selectedTags.push(tag);
+            }
+        },
+
+        isTagSelected(tag) {
+            return this.selectedTags.includes(tag);
+        },
+
+        // Image requirements helper
+        getImageRequirements(type) {
+            const config = this.imageSizingConfig[type];
+            return `${config.width}x${config.height}px`;
+        },
+
+        // AI HTML generation
+        showAiHtmlModal() {
+            this.isAiHtmlModalVisible = true;
+            this.aiHtmlPrompt = '';
+            this.aiHtmlType = 'welcome';
+            this.aiHtmlStyle = 'professional';
+            this.generatedHtml = '';
+            this.aiHtmlError = '';
+        },
+
+        closeAiHtmlModal() {
+            this.isAiHtmlModalVisible = false;
+        },
+
+        async generateHtmlContent() {
+            if (!this.aiHtmlPrompt.trim()) return;
+
+            this.isGeneratingHtml = true;
+            this.aiHtmlError = '';
+
+            try {
+                const response = await fetch('/api/templates/generate-html', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        prompt: this.aiHtmlPrompt,
+                        type: this.aiHtmlType,
+                        style: this.aiHtmlStyle
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    this.generatedHtml = result.html;
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to generate HTML');
+                }
+            } catch (error) {
+                this.aiHtmlError = error.message;
+            } finally {
+                this.isGeneratingHtml = false;
+            }
+        },
+
+        acceptGeneratedHtml() {
+            if (this.generatedHtml) {
+                this.currentTemplate.bodyElements.push({
+                    type: 'text',
+                    content: this.generatedHtml,
+                    showPreview: false
+                });
+                this.clearGeneratedHtml();
+                this.closeAiHtmlModal();
+            }
+        },
+
+        clearGeneratedHtml() {
+            this.generatedHtml = '';
+            this.aiHtmlError = '';
+        },
+
+        regenerateHtml() {
+            this.generateHtmlContent();
+        },
+
+        // Image loading handlers
+        handleImageLoad(event, template) {
+            const computedStyle = window.getComputedStyle(event.target);
+            
+            // Check if the image was hidden by CSS and force it back to visible
+            const currentStyle = window.getComputedStyle(event.target);
+            if (currentStyle.display === 'none' || currentStyle.visibility === 'hidden' || currentStyle.opacity === '0') {
+                event.target.style.setProperty('display', 'block', 'important');
+                event.target.style.setProperty('visibility', 'visible', 'important');
+                event.target.style.setProperty('opacity', '1', 'important');
+            }
+        },
+
+        // AI Image generation methods
+        // Opens the simplified AI background generator modal
+        // NOTE: Text is NEVER baked into AI images - users must use text blocks in template editor
+        showAiImageModal(type, index = null) {
+            this.currentImageType = type;
+            this.currentImageIndex = index;
+            this.isAiImageModalVisible = true;
+            this.aiImagePrompt = '';
+            this.aiImageStyle = 'realistic';
+            this.aiImageSize = '1024x1024';
+            this.generatedImageUrl = '';
+            this.aiImageError = '';
+        },
+
+        closeAiImageModal() {
+            this.isAiImageModalVisible = false;
+        },
+
+        async generateAiImage() {
+            if (!this.aiImagePrompt.trim()) return;
+
+            this.isGeneratingImage = true;
+            this.aiImageError = '';
+            this.imageLoading = false;
+
+            try {
+                // Determine aspect ratio and recommended dimensions based on image type
+                const aspectRatio = this.getAspectRatioForType(this.currentImageType);
+                const recommendedDimensions = this.getRecommendedDimensions(this.currentImageType);
+
+                // Enhance the prompt with specific requirements
+                let enhancedPrompt = this.aiImagePrompt;
+                if (this.currentImageType === 'header' || this.currentImageType === 'banner') {
+                    enhancedPrompt = `${this.aiImagePrompt}, ${this.aiImageStyle} style, ${recommendedDimensions.width}x${recommendedDimensions.height} aspect ratio, high quality, professional marketing image`;
+                }
+
+                const response = await fetch('/api/templates/generate-image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        prompt: enhancedPrompt,
+                        style: this.aiImageStyle,
+                        size: this.aiImageSize,
+                        aspectRatio: aspectRatio
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    this.generatedImageUrl = result.imageUrl || result.url;
+                    this.imageLoading = true;
+                    
+                    // Set a timeout to handle cases where image doesn't load
+                    setTimeout(() => {
+                        if (this.imageLoading) {
+
+                            this.imageLoading = false;
+                        }
+                    }, 10000); // 10 second timeout
+                } else {
+                    const error = await response.json();
+                    
+                    // Check if it's a daily limit error
+                    if (error.limitReached) {
+                        this.showDailyLimitPopup(error);
+                        return;
+                    }
+
+                    // Show detailed error message
+                    this.aiImageError = error.message || error.details || error.error || 'Failed to generate image';
+                    console.error('AI Image generation failed:', error);
+                    
+                    // If it's an OpenAI configuration error, show a more helpful message
+                    if (error.error === 'OpenAI API test failed' || 
+                        error.error === 'OpenAI not initialized' || 
+                        error.error === 'OpenAI API key missing') {
+                        this.aiImageError = `OpenAI API Configuration Error: ${error.message}. Please contact your administrator.`;
+                    }
+                    
+                    throw new Error(this.aiImageError);
+                }
+            } catch (error) {
+                this.aiImageError = error.message;
+            } finally {
+                this.isGeneratingImage = false;
+            }
+        },
+
+        useGeneratedImage() {
+            if (!this.generatedImageUrl) return;
+
+            // Set the generated image to the appropriate field
+            if (this.currentImageType === 'header') {
+                this.currentTemplate.headerImage = this.generatedImageUrl;
+            } else if (this.currentImageType === 'banner') {
+                this.currentTemplate.bannerImage = this.generatedImageUrl;
+            } else if (this.currentImageType === 'footer') {
+                this.currentTemplate.footerImage = this.generatedImageUrl;
+            } else if (this.currentImageType === 'body' && this.currentImageIndex !== null) {
+                // Update existing body image element
+                this.currentTemplate.bodyElements[this.currentImageIndex].url = this.generatedImageUrl;
+                this.currentTemplate.bodyElements[this.currentImageIndex].alt = 'AI Generated Image';
+            } else if (this.currentImageType === 'body') {
+                // Add as a new body image element
+                this.currentTemplate.bodyElements.push({
+                    type: 'image',
+                    url: this.generatedImageUrl,
+                    alt: 'AI Generated Image'
+                });
+            }
+
+            this.closeAiImageModal();
+            this.showToast('AI image applied successfully!', 'success');
+        },
+
+        clearGeneratedImage() {
+            this.generatedImageUrl = '';
+            this.aiImageError = '';
+            this.imageLoading = false;
+        },
+
+        generateImage() {
+            this.generateAiImage();
+        },
+
+        acceptGeneratedImage() {
+            if (!this.generatedImageUrl) return;
+
+            // Set the generated image to the appropriate field
+            if (this.currentImageType === 'header') {
+                this.currentTemplate.headerImage = this.generatedImageUrl;
+            } else if (this.currentImageType === 'banner') {
+                this.currentTemplate.bannerImage = this.generatedImageUrl;
+            } else if (this.currentImageType === 'footer') {
+                this.currentTemplate.footerImage = this.generatedImageUrl;
+            } else if (this.currentImageType === 'body' && this.currentImageIndex !== null) {
+                // Update existing body image element
+                this.currentTemplate.bodyElements[this.currentImageIndex].url = this.generatedImageUrl;
+                this.currentTemplate.bodyElements[this.currentImageIndex].alt = 'AI Generated Image';
+            } else if (this.currentImageType === 'body') {
+                // Add as a new body image element
+                this.currentTemplate.bodyElements.push({
+                    type: 'image',
+                    url: this.generatedImageUrl,
+                    alt: 'AI Generated Image'
+                });
+            }
+
+            this.closeAiImageModal();
+            this.showToast('AI image applied successfully!', 'success');
+        },
+
+        async saveToLibrary() {
+            if (!this.generatedImageUrl) {
+                this.showToast('No image to save to library', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/images/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        imageUrl: this.generatedImageUrl,
+                        name: 'AI Generated Image',
+                        description: `AI generated image for ${this.currentImageType} section`,
+                        tags: [], // No automatic tags - user can add tags manually
+                        section: this.currentImageType
+                    })
+                });
+
+                if (response.ok) {
+                    this.showToast('Image saved to library successfully!', 'success');
+                } else {
+                    throw new Error('Failed to save image to library');
+                }
+            } catch (error) {
+                this.showToast('Failed to save image to library: ' + error.message, 'error');
+            }
+        },
+
+        // Helper methods for AI image generation
+        getAspectRatioForType(type) {
+            const config = this.imageSizingConfig[type];
+            return config.width / config.height;
+        },
+
+        getRecommendedDimensions(type) {
+            return this.imageSizingConfig[type];
+        },
+
+        getImagePromptPlaceholder() {
+            switch (this.currentImageType) {
+                case 'header':
+                    return 'e.g., Professional business header with modern design, blue gradient background, clean typography';
+                case 'banner':
+                    return 'e.g., Promotional banner with product showcase, vibrant colors, call-to-action elements';
+                case 'body':
+                    return 'e.g., Product image, lifestyle photo, or illustration that matches your content';
+                case 'footer':
+                    return 'e.g., Company logo, contact information, or brand elements for footer';
+                default:
+                    return 'Describe the image you want to generate...';
+            }
+        },
+
+        // Get human-readable display name for each slot
+        getSlotDisplayName(slot) {
+            const names = {
+                'header': 'Header Background',
+                'banner': 'Banner Image',
+                'body': 'Body Image',
+                'footer': 'Footer Image (Left)',
+                'footer-left': 'Footer Image (Left)'
+            };
+            return names[slot] || 'Image';
+        },
+
+        // Get style-focused placeholder text for each slot
+        getSlotStylePlaceholder(slot) {
+            const placeholders = {
+                'header': 'e.g., Abstract blue gradient with subtle geometric shapes, professional and modern feel, soft lighting...',
+                'banner': 'e.g., Warm sunset colors with bokeh lights, festive holiday atmosphere, elegant gold accents...',
+                'body': 'e.g., Clean white background with soft shadows, minimalist product photography style...',
+                'footer': 'e.g., Simple dark gradient, subtle texture, professional corporate look...',
+                'footer-left': 'e.g., Simple dark gradient, subtle texture, professional corporate look...'
+            };
+            return placeholders[slot] || 'Describe the background style you want...';
+        },
+
+        // Map slot names to API slot values
+        getApiSlotName(slot) {
+            // Map internal slot names to API-expected names
+            if (slot === 'footer') return 'footer-left';
+            return slot;
+        },
+
+        // Generate image using the new two-stage endpoint
+        // NOTE: No text is ever baked into AI images - users must add text via template text blocks
+        async generateSlotImage() {
+            if (!this.aiImagePrompt.trim()) return;
+
+            this.isGeneratingImage = true;
+            this.aiImageError = '';
+            this.imageLoading = false;
+
+            try {
+                // Build the request for the new endpoint
+                const apiSlot = this.getApiSlotName(this.currentImageType);
+                const templateId = this.currentTemplate.id || 'new';
+                
+                // Build style description
+                let styleDescription = this.aiImagePrompt.trim();
+                
+                // Add style preference
+                if (this.aiImageStyle && this.aiImageStyle !== 'realistic') {
+                    styleDescription += `. Style: ${this.aiImageStyle}`;
+                }
+
+                const response = await fetch(`/api/templates/${templateId}/generate-slot-image`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        slot: apiSlot,
+                        styleDescription: styleDescription
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    this.generatedImageUrl = result.imageUrl;
+                    this.imageLoading = true;
+
+                    // Timeout for slow image loads
+                    setTimeout(() => {
+                        if (this.imageLoading) {
+                            this.imageLoading = false;
+                        }
+                    }, 10000);
+                } else {
+                    const error = await response.json();
+
+                    // Check for daily limit
+                    if (error.limitReached) {
+                        this.showDailyLimitPopup(error);
+                        return;
+                    }
+
+                    this.aiImageError = error.message || error.error || 'Failed to generate image';
+                }
+            } catch (error) {
+                console.error('Slot image generation error:', error);
+                this.aiImageError = error.message || 'An unexpected error occurred';
+            } finally {
+                this.isGeneratingImage = false;
+            }
+        },
+
+        // Tip system methods
+        showTip(section) {
+            const tips = {
+                header: {
+                    title: 'Header Section Tips',
+                    tips: [
+                        'Use AI to generate a clean background, then add your title via the Header Text field',
+                        'High-contrast backgrounds work best for text overlays',
+                        'Recommended size: 1200×400px for optimal display',
+                        'Avoid AI-generated text in images—spelling errors are common'
+                    ]
+                },
+                banner: {
+                    title: 'Banner Section Tips',
+                    tips: [
+                        'Perfect for seasonal themes, promotions, and decorative visuals',
+                        'Let AI create the design; add any promo text via Text Blocks',
+                        'Recommended size: 1200×300px',
+                        'Eye-catching gradients and abstract patterns work great'
+                    ]
+                },
+                body: {
+                    title: 'Body Content Tips',
+                    tips: [
+                        'Mix text blocks, images, and buttons for engaging content',
+                        'Keep paragraphs short and scannable',
+                        'AI works well for product backgrounds and illustrations',
+                        'Use Text Blocks for captions and calls-to-action'
+                    ]
+                },
+                footer: {
+                    title: 'Footer Section Tips',
+                    tips: [
+                        'Best for logos, abstract graphics, or simple branding elements',
+                        'Use the Footer Text field for contact info and links',
+                        'Recommended size: 600×200px',
+                        'Unsubscribe links are automatically added for compliance'
+                    ]
+                }
+            };
+
+            this.tipData = tips[section] || { title: 'Tips', tips: ['No tips available for this section.'] };
+            this.isTipModalVisible = true;
+        },
+
+        closeTipModal() {
+            this.isTipModalVisible = false;
+        },
+
+        closeTip() {
+            this.isTipModalVisible = false;
+        },
+
+        showVersionHistory(template) {
+            this.selectedTemplateForHistory = template;
+            this.isVersionHistoryVisible = true;
+            this.loadVersionHistory(template.id);
+        },
+
+        closeVersionHistory() {
+            this.isVersionHistoryVisible = false;
+            this.selectedTemplateForHistory = null;
+            this.versionHistory = [];
+        },
+
+        async loadVersionHistory(templateId) {
+            try {
+                const response = await fetch(`/api/templates/${templateId}/versions`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    this.versionHistory = await response.json();
+                } else {
+                    this.versionHistory = [];
+                }
+            } catch (error) {
+                console.error('Failed to load version history:', error);
+                this.versionHistory = [];
+            }
+        },
+
+        async restoreVersion(version) {
+            if (!confirm('Are you sure you want to restore this version? This will overwrite the current template.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/templates/${this.selectedTemplateForHistory.id}/restore`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ versionId: version.id })
+                });
+
+                if (response.ok) {
+                    const restoredTemplate = await response.json();
+                    
+                    // Update the template in the list
+                    const index = this.templates.findIndex(t => t.id === restoredTemplate.id);
+                    if (index !== -1) {
+                        this.templates[index] = restoredTemplate;
+                    }
+                    
+                    this.showToast('Template restored successfully!', 'success');
+                    this.closeVersionHistory();
+                } else {
+                    throw new Error('Failed to restore template');
+                }
+            } catch (error) {
+                this.showToast('Failed to restore template: ' + error.message, 'error');
+            }
+        },
+
+        scrollToPreview() {
+            const previewElement = document.getElementById('template-preview');
+            if (previewElement) {
+                previewElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        },
+
+        togglePreview(index) {
+            if (!this.currentTemplate.bodyElements[index].showPreview) {
+                this.currentTemplate.bodyElements[index].showPreview = true;
+            } else {
+                this.currentTemplate.bodyElements[index].showPreview = false;
+            }
+        },
+
+        debugImage(template) {
+            // Debug function - no logging
+        },
+
+        handleImageError(event, template) {
+
+            // You can add fallback image logic here
+        },
+
+        handleImageLoad(event, type) {
+
+            if (type === 'generated') {
+                this.imageLoading = false;
+            }
+        },
+
+        handleGeneratedImageError(event) {
+
+            this.imageLoading = false;
+            this.showToast('Failed to load generated image', 'error');
+        },
+
+        getGeneratedImageContainerStyle() {
+            if (!this.currentImageType) return {};
+            const config = this.imageSizingConfig[this.currentImageType];
+            if (!config) return {};
+            
+            return {
+                aspectRatio: `${config.width}/${config.height}`,
+                maxWidth: '100%',
+                maxHeight: '400px'
+            };
+        },
+
+        // Add to library method
+        async addToLibrary(type, imageUrl) {
+            if (!imageUrl) {
+                this.showToast('No image to add to library', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/images/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        imageUrl: imageUrl,
+                        name: `${type} image`,
+                        description: `Image from ${type} section`,
+                        tags: [], // No automatic tags - user can add tags manually
+                        section: type
+                    })
+                });
+
+                if (response.ok) {
+                    this.showToast('Image added to library successfully!', 'success');
+                } else {
+                    throw new Error('Failed to add image to library');
+                }
+            } catch (error) {
+                this.showToast('Failed to add image to library: ' + error.message, 'error');
+            }
+        }
+    },
+    async created() {
+        // Server already authenticated this page (cookie); don't redirect on missing localStorage token.
+        await this.loadTemplates();
+    }
+}).mount('#app')
+</script>

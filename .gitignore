@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Sensitive / voter & membership data (DO NOT COMMIT)
+.eda-master/
+**/.eda-master/
+data/
+**/data/
+uploads/
+**/uploads/
+exports/
+**/exports/
+backups/
+**/backups/
+tmp/
+**/tmp/
+
+# Common data file types
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.ods
+*.numbers
+*.pdf
+*.xml
+*.zip
+*.json
+
+# Logs / runtime
+logs/
+.pm2/
+.pids/
+
+# Editor/OS
+.vscode/
+.DS_Store
+Thumbs.db

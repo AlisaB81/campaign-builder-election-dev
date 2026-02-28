@@ -1,0 +1,488 @@
+<%- include('partials/nav') %>
+<style>
+.btn-delete-old-90 { background-color: #dc2626; color: #fff; }
+.btn-delete-old-90:hover { background-color: #b91c1c; }
+</style>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <div class="py-6 space-y-6">
+        <!-- Admin: Inbox of requests from other accounts -->
+        <template v-if="isAppOwner">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-semibold text-gray-900 mb-2">Requests inbox</h1>
+                    <p class="text-sm text-gray-600">Review and respond to requests from accounts. Mark complete or reply with a question.</p>
+                </div>
+                <div v-if="newRequestCount > 0" class="flex items-center gap-2">
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-amber-100 text-amber-800">
+                        {{ newRequestCount }} new
+                    </span>
+                    <button @click="loadRequests" class="px-3 py-1.5 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm">Refresh</button>
+                </div>
+            </div>
+            <div class="bg-white shadow rounded-lg p-6">
+                <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                    <p class="text-sm text-gray-600">Showing {{ pagedAdminRequests.length }} of {{ requests.length }} requests</p>
+                    <button type="button" @click="deleteOldAdminRequests"
+                            class="requests-delete-old-90 inline-flex items-center justify-center flex-shrink-0 px-4 py-2 text-sm font-medium whitespace-nowrap rounded-md border border-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                            style="background-color:#dc2626 !important; color:#fff !important;">
+                        Delete completed requests older than 90 days
+                    </button>
+                </div>
+                <div v-if="adminLoading" class="text-center py-8 text-gray-500">Loading requests…</div>
+                <div v-else-if="requests.length === 0" class="text-center py-8 text-gray-500">No requests from accounts yet.</div>
+                <ul v-else class="divide-y divide-gray-200 space-y-4">
+                    <li v-for="r in pagedAdminRequests" :key="r.accountId + '-' + r.id" class="py-4 border-b border-gray-100 last:border-0">
+                        <div class="flex flex-wrap justify-between gap-2">
+                            <div>
+                                <span :class="!r.readByAdmin ? 'font-semibold' : ''">{{ formatType(r.type) }}</span>
+                                <span class="text-xs text-gray-500 ml-2">#{{ r.id }}</span>
+                                <span class="text-xs text-gray-500 ml-2">Account: {{ r.accountName || r.accountId }}</span>
+                                <span v-if="!r.readByAdmin" class="ml-2 px-1.5 py-0.5 rounded text-xs bg-amber-100 text-amber-800">New</span>
+                            </div>
+                            <select v-model="r._status" @change="updateStatus(r)" class="border rounded px-2 py-1 text-sm">
+                                <option value="Submitted">Submitted</option>
+                                <option value="In Review">In Review</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Completed">Completed</option>
+                            </select>
+                        </div>
+                        <div class="text-sm text-gray-600 mt-1">{{ summary(r) }}</div>
+                        <div class="text-xs text-gray-500 mt-1">{{ formatDate(r.createdAt) }} · {{ r.submittedBy || '—' }}</div>
+
+                        <!-- Full request details -->
+                        <div class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm">
+                            <p class="font-medium text-gray-700 mb-2">Request details</p>
+                            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                <template v-if="r.type === 'campaign_request'">
+                                    <dt class="text-gray-500">Campaign type</dt><dd>{{ r.campaignType || '—' }}</dd>
+                                    <dt class="text-gray-500">Objective</dt><dd>{{ r.objective || '—' }}</dd>
+                                    <dt class="text-gray-500">Audience / list</dt><dd>{{ r.audience || '—' }}</dd>
+                                    <dt class="text-gray-500">Preferred send date</dt><dd>{{ r.preferredSendDate || '—' }}</dd>
+                                    <template v-if="r.messageCopy">
+                                        <dt class="text-gray-500 sm:col-span-1">Message copy</dt>
+                                        <dd class="sm:col-span-2 whitespace-pre-wrap">{{ r.messageCopy }}</dd>
+                                    </template>
+                                </template>
+                                <template v-else-if="r.type === 'token_request'">
+                                    <dt class="text-gray-500">Token type</dt><dd>{{ r.tokenType || '—' }}</dd>
+                                    <dt class="text-gray-500">Quantity requested</dt><dd>{{ r.quantityRequested != null ? r.quantityRequested : '—' }}</dd>
+                                    <template v-if="r.reason">
+                                        <dt class="text-gray-500 sm:col-span-1">Reason</dt>
+                                        <dd class="sm:col-span-2">{{ r.reason }}</dd>
+                                    </template>
+                                </template>
+                                <template v-else>
+                                    <template v-if="r.message">
+                                        <dt class="text-gray-500 sm:col-span-1">Message</dt>
+                                        <dd class="sm:col-span-2 whitespace-pre-wrap">{{ r.message }}</dd>
+                                    </template>
+                                </template>
+                                <dt class="text-gray-500">Submitted by</dt><dd>{{ r.submittedBy || '—' }}</dd>
+                                <dt class="text-gray-500">Created</dt><dd>{{ formatDate(r.createdAt) }}</dd>
+                                <template v-if="r.updatedAt"><dt class="text-gray-500">Updated</dt><dd>{{ formatDate(r.updatedAt) }}</dd></template>
+                            </dl>
+                        </div>
+
+                        <div v-if="r.adminReply" class="mt-2 p-2 bg-indigo-50 rounded text-sm border border-indigo-100"><strong>Your reply:</strong> {{ r.adminReply }} <span v-if="r.repliedAt" class="text-xs text-gray-500">({{ formatDate(r.repliedAt) }})</span></div>
+                        <div class="mt-2 flex gap-2 items-end">
+                            <textarea v-model="r._reply" placeholder="Reply or add completion message…" rows="2" class="flex-1 border rounded-md px-3 py-2 text-sm"></textarea>
+                            <button @click="sendReply(r)" :disabled="!r._reply || r._sending" class="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 text-sm">Send reply</button>
+                            <button @click="deleteAdminRequest(r)" class="px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm">Delete</button>
+                        </div>
+                    </li>
+                </ul>
+                <div v-if="adminTotalPages > 1" class="flex items-center justify-end gap-2 mt-4">
+                    <button @click="adminPage = Math.max(1, adminPage - 1)"
+                            :disabled="adminPage === 1"
+                            class="px-3 py-1.5 border rounded text-sm disabled:opacity-50">Prev</button>
+                    <span class="text-sm text-gray-600">Page {{ adminPage }} / {{ adminTotalPages }}</span>
+                    <button @click="adminPage = Math.min(adminTotalPages, adminPage + 1)"
+                            :disabled="adminPage === adminTotalPages"
+                            class="px-3 py-1.5 border rounded text-sm disabled:opacity-50">Next</button>
+                </div>
+            </div>
+        </template>
+
+        <!-- User: Submit and view own requests -->
+        <template v-else>
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900 mb-2">Requests</h1>
+            <p class="text-sm text-gray-600">Submit campaign, token, or billing requests. Campaign Builder manages fulfillment and billing.</p>
+        </div>
+
+        <!-- New Request Card -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">New Request</h2>
+            <form @submit.prevent="submitRequest" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Request type</label>
+                    <select v-model="form.type" class="w-full border rounded-md px-3 py-2 text-sm">
+                        <option value="campaign_request">Campaign Request</option>
+                        <option value="token_request">Token Request</option>
+                        <option value="billing_request">General Billing Request</option>
+                    </select>
+                </div>
+
+                <!-- Campaign Request fields -->
+                <template v-if="form.type === 'campaign_request'">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Campaign type</label>
+                        <select v-model="form.campaignType" class="w-full border rounded-md px-3 py-2 text-sm">
+                            <option value="SMS">SMS</option>
+                            <option value="Email">Email</option>
+                            <option value="AI Calling">AI Calling</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Objective</label>
+                        <input v-model="form.objective" type="text" class="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. GOTV reminder">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Audience / list</label>
+                        <input v-model="form.audience" type="text" class="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. Ward 3 list, 500 contacts">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Message copy (optional)</label>
+                        <textarea v-model="form.messageCopy" rows="3" class="w-full border rounded-md px-3 py-2 text-sm" placeholder="Draft or notes"></textarea>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Preferred send date</label>
+                        <input v-model="form.preferredSendDate" type="text" class="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. Oct 15">
+                    </div>
+                </template>
+
+                <!-- Token Request fields -->
+                <template v-if="form.type === 'token_request'">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Token type</label>
+                        <select v-model="form.tokenType" class="w-full border rounded-md px-3 py-2 text-sm">
+                            <option value="SMS">SMS</option>
+                            <option value="Email">Email</option>
+                            <option value="AI">AI</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Quantity requested</label>
+                        <input v-model.number="form.quantityRequested" type="number" min="1" class="w-full border rounded-md px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Reason / justification</label>
+                        <textarea v-model="form.reason" rows="3" class="w-full border rounded-md px-3 py-2 text-sm" placeholder="e.g. GOTV campaign"></textarea>
+                    </div>
+                </template>
+
+                <!-- Billing Request fields -->
+                <template v-if="form.type === 'billing_request'">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                        <textarea v-model="form.message" rows="4" class="w-full border rounded-md px-3 py-2 text-sm" placeholder="Clarification, invoice question, or other billing request"></textarea>
+                    </div>
+                </template>
+
+                <p class="text-xs text-gray-500">You can describe attachments or add links in the message. Requests are reviewed by Campaign Builder.</p>
+
+                <div v-if="submitError" class="text-sm text-red-600">{{ submitError }}</div>
+                <div v-if="submitSuccess" class="text-sm text-green-600">{{ submitSuccess }}</div>
+                <div class="flex justify-end">
+                    <button type="submit" :disabled="submitting" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium">
+                        {{ submitting ? 'Submitting…' : 'Submit Request' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Request History -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-lg font-medium text-gray-900 mb-4">Request history</h2>
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+                <p class="text-sm text-gray-600">Showing {{ pagedUserRequests.length }} of {{ requests.length }} requests</p>
+                <button type="button" @click="deleteOldUserRequests"
+                        class="requests-delete-old-90 inline-flex items-center justify-center flex-shrink-0 px-4 py-2 text-sm font-medium whitespace-nowrap rounded-md border border-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                        style="background-color:#dc2626 !important; color:#fff !important;">
+                    Delete completed requests older than 90 days
+                </button>
+            </div>
+            <div v-if="loading" class="text-center py-6 text-gray-500">Loading…</div>
+            <div v-else-if="requests.length === 0" class="text-center py-6 text-gray-500">No requests yet. Submit one above.</div>
+            <ul v-else class="divide-y divide-gray-200">
+                <li v-for="r in pagedUserRequests" :key="r.id" class="py-4 first:pt-0">
+                    <div class="flex flex-wrap items-start justify-between gap-2">
+                        <div class="flex-1 min-w-0">
+                            <span class="font-medium">{{ formatType(r.type) }}</span>
+                            <span class="text-xs text-gray-500 ml-2">#{{ r.id }}</span>
+                            <div class="text-sm text-gray-600 mt-1">{{ summary(r) }}</div>
+                            <div class="text-xs text-gray-500 mt-1">{{ formatDate(r.createdAt) }}</div>
+                            <div v-if="r.adminReply" class="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-md">
+                                <p class="text-xs font-medium text-indigo-800 mb-1">Update from Campaign Builder</p>
+                                <p class="text-sm text-gray-700">{{ r.adminReply }}</p>
+                                <p v-if="r.repliedAt" class="text-xs text-gray-500 mt-1">{{ formatDate(r.repliedAt) }}</p>
+                            </div>
+                        </div>
+                        <span :class="statusClass(r.status)" class="px-2 py-1 text-xs rounded-full font-medium shrink-0">
+                            {{ r.status }}
+                        </span>
+                    </div>
+                    <div class="mt-2 flex justify-end">
+                        <button @click="deleteUserRequest(r)" class="px-3 py-1.5 bg-red-600 text-white rounded-md hover:bg-red-700 text-xs">Delete</button>
+                    </div>
+                </li>
+            </ul>
+            <div v-if="userTotalPages > 1" class="flex items-center justify-end gap-2 mt-4">
+                <button @click="userPage = Math.max(1, userPage - 1)"
+                        :disabled="userPage === 1"
+                        class="px-3 py-1.5 border rounded text-sm disabled:opacity-50">Prev</button>
+                <span class="text-sm text-gray-600">Page {{ userPage }} / {{ userTotalPages }}</span>
+                <button @click="userPage = Math.min(userTotalPages, userPage + 1)"
+                        :disabled="userPage === userTotalPages"
+                        class="px-3 py-1.5 border rounded text-sm disabled:opacity-50">Next</button>
+            </div>
+        </div>
+        </template>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            isAppOwner: <%= typeof isAppOwner !== 'undefined' && isAppOwner ? 'true' : 'false' %>,
+            requests: [],
+            loading: true,
+            adminLoading: false,
+            submitting: false,
+            submitError: '',
+            submitSuccess: '',
+            adminPage: 1,
+            userPage: 1,
+            pageSize: 10,
+            form: {
+                type: 'campaign_request',
+                campaignType: 'SMS',
+                objective: '',
+                audience: '',
+                messageCopy: '',
+                preferredSendDate: '',
+                tokenType: 'SMS',
+                quantityRequested: null,
+                reason: '',
+                message: ''
+            }
+        };
+    },
+    computed: {
+        newRequestCount() {
+            return this.requests.filter(r => !r.readByAdmin).length;
+        },
+        adminTotalPages() {
+            const n = this.requests.length;
+            return Math.max(1, Math.ceil(n / this.pageSize));
+        },
+        userTotalPages() {
+            const n = this.requests.length;
+            return Math.max(1, Math.ceil(n / this.pageSize));
+        },
+        pagedAdminRequests() {
+            const start = (this.adminPage - 1) * this.pageSize;
+            return this.requests.slice(start, start + this.pageSize);
+        },
+        pagedUserRequests() {
+            const start = (this.userPage - 1) * this.pageSize;
+            return this.requests.slice(start, start + this.pageSize);
+        }
+    },
+    methods: {
+        async loadRequests() {
+            if (this.isAppOwner) {
+                this.adminLoading = true;
+                try {
+                    const res = await fetch('/api/admin/requests', { credentials: 'include' });
+                    if (res.ok) {
+                        const list = await res.json();
+                        this.requests = (list || []).map(r => ({ ...r, _status: r.status, _reply: '', _sending: false }));
+                    }
+                } catch (e) {
+                    console.error(e);
+                } finally {
+                    this.adminLoading = false;
+                }
+                return;
+            }
+            this.loading = true;
+            try {
+                const res = await fetch('/api/requests', { credentials: 'include' });
+                if (res.ok) {
+                    this.requests = await res.json();
+                    this.userPage = 1;
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loading = false;
+            }
+        },
+        async updateStatus(r) {
+            try {
+                const res = await fetch('/api/admin/requests', {
+                    method: 'PATCH',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accountId: r.accountId, requestId: r.id, status: r._status })
+                });
+                if (res.ok) r.status = r._status;
+            } catch (e) {
+                console.error(e);
+            }
+        },
+        async sendReply(r) {
+            if (!r._reply || r._sending) return;
+            r._sending = true;
+            try {
+                const res = await fetch('/api/admin/requests', {
+                    method: 'PATCH',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accountId: r.accountId, requestId: r.id, adminReply: r._reply })
+                });
+                if (res.ok) {
+                    r.adminReply = r._reply;
+                    r._reply = '';
+                    r.readByAdmin = true;
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                r._sending = false;
+            }
+        },
+        async submitRequest() {
+            this.submitError = '';
+            this.submitSuccess = '';
+            this.submitting = true;
+            try {
+                const payload = { type: this.form.type };
+                if (this.form.type === 'campaign_request') {
+                    payload.campaignType = this.form.campaignType;
+                    payload.objective = this.form.objective;
+                    payload.audience = this.form.audience;
+                    payload.messageCopy = this.form.messageCopy;
+                    payload.preferredSendDate = this.form.preferredSendDate;
+                } else if (this.form.type === 'token_request') {
+                    payload.tokenType = this.form.tokenType;
+                    payload.quantityRequested = this.form.quantityRequested;
+                    payload.reason = this.form.reason;
+                } else {
+                    payload.message = this.form.message;
+                }
+                const res = await fetch('/api/requests', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    this.submitSuccess = 'Request submitted.';
+                    this.requests.unshift(data);
+                    this.form = {
+                        type: this.form.type,
+                        campaignType: 'SMS',
+                        objective: '',
+                        audience: '',
+                        messageCopy: '',
+                        preferredSendDate: '',
+                        tokenType: 'SMS',
+                        quantityRequested: null,
+                        reason: '',
+                        message: ''
+                    };
+                } else {
+                    this.submitError = data.error || 'Failed to submit request.';
+                }
+            } catch (e) {
+                this.submitError = e.message || 'Failed to submit request.';
+            } finally {
+                this.submitting = false;
+            }
+        },
+        formatType(type) {
+            const map = {
+                campaign_request: 'Campaign Request',
+                token_request: 'Token Request',
+                billing_request: 'Billing Request',
+                general: 'General Request'
+            };
+            return map[type] || type;
+        },
+        summary(r) {
+            if (r.type === 'campaign_request') return (r.campaignType || '') + (r.objective ? ' – ' + r.objective : '');
+            if (r.type === 'token_request') return (r.quantityRequested ? r.quantityRequested + ' ' : '') + (r.tokenType || '') + (r.reason ? ' – ' + (r.reason || '').slice(0, 40) : '');
+            return (r.message || '').slice(0, 60) + ((r.message || '').length > 60 ? '…' : '');
+        },
+        formatDate(d) {
+            if (!d) return '';
+            return new Date(d).toLocaleDateString() + ' ' + new Date(d).toLocaleTimeString();
+        },
+        statusClass(status) {
+            const map = {
+                'Submitted': 'bg-blue-100 text-blue-800',
+                'In Review': 'bg-yellow-100 text-yellow-800',
+                'Approved': 'bg-green-100 text-green-800',
+                'Completed': 'bg-green-100 text-green-800'
+            };
+            return map[status] || 'bg-gray-100 text-gray-800';
+        },
+        async deleteUserRequest(r) {
+            if (!r || !r.id) return;
+            if (!confirm('Delete this request?')) return;
+            try {
+                const res = await fetch('/api/requests/' + encodeURIComponent(r.id), { method: 'DELETE', credentials: 'include' });
+                if (res.ok) {
+                    this.requests = this.requests.filter(x => x.id !== r.id);
+                }
+            } catch (e) { console.error(e); }
+        },
+        async deleteAdminRequest(r) {
+            if (!r || !r.accountId || !r.id) return;
+            if (!confirm('Delete this request?')) return;
+            try {
+                const res = await fetch('/api/admin/requests', {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ accountId: r.accountId, requestId: r.id })
+                });
+                if (res.ok) {
+                    this.requests = this.requests.filter(x => !(x.accountId === r.accountId && x.id === r.id));
+                }
+            } catch (e) { console.error(e); }
+        },
+        async deleteOldUserRequests() {
+            if (!confirm('Delete completed requests older than 90 days?')) return;
+            try {
+                const res = await fetch('/api/requests/old?days=90', { method: 'DELETE', credentials: 'include' });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data.deleted) {
+                    await this.loadRequests();
+                    this.userPage = 1;
+                }
+            } catch (e) { console.error(e); }
+        },
+        async deleteOldAdminRequests() {
+            if (!confirm('Delete completed requests older than 90 days (all accounts)?')) return;
+            try {
+                const res = await fetch('/api/admin/requests/old?days=90', { method: 'DELETE', credentials: 'include' });
+                const data = await res.json().catch(() => ({}));
+                if (res.ok) {
+                    await this.loadRequests();
+                    this.adminPage = 1;
+                }
+            } catch (e) { console.error(e); }
+        }
+    },
+    async mounted() {
+        await this.loadRequests();
+    }
+}).mount('#app');
+</script>

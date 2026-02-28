@@ -1,0 +1,1095 @@
+<script>
+    // Admin dropdown hover functions (required by nav partial)
+    function showAdminDropdown(type) {
+        const dropdownId = type === 'desktop' ? 'adminDropdownDesktop' : 'adminDropdownTablet';
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) {
+            dropdown.classList.remove('hidden');
+            dropdown.classList.add('block');
+        }
+    }
+    
+    function hideAdminDropdown(type) {
+        const dropdownId = type === 'desktop' ? 'adminDropdownDesktop' : 'adminDropdownTablet';
+        const dropdown = document.getElementById(dropdownId);
+        if (dropdown) {
+            dropdown.classList.add('hidden');
+            dropdown.classList.remove('block');
+        }
+    }
+</script>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <%- include('partials/nav') %>
+    
+    <div class="py-6">
+        <h1 class="text-2xl font-semibold text-gray-900 mb-2">Admin Management</h1>
+        <p class="text-sm text-gray-600 mb-6">Owner managed. Tokens and phone numbers are allocated by Campaign Builder; users submit requests instead of purchasing.</p>
+
+        <!-- User Management -->
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">User Management</h2>
+                <button @click="showAddUserForm = !showAddUserForm" 
+                        type="button"
+                        class="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 text-sm font-medium">
+                    {{ showAddUserForm ? 'Cancel' : 'Add New User' }}
+                </button>
+            </div>
+            
+            <!-- Add User Form -->
+            <div v-if="showAddUserForm" class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h3 class="text-lg font-medium mb-4">Create New User</h3>
+                <form @submit.prevent="createUser" class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Required Fields -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                            <input v-model="newUser.email" 
+                                   type="email" 
+                                   required
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                            <input v-model="newUser.password" 
+                                   type="password" 
+                                   required
+                                   minlength="8"
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">Minimum 8 characters, must include uppercase, lowercase, number, and special character</p>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                            <input v-model="newUser.username" 
+                                   type="text" 
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                            <input v-model="newUser.firstName" 
+                                   type="text" 
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                            <input v-model="newUser.lastName" 
+                                   type="text" 
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                        
+                        <!-- User Type -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">User Type *</label>
+                            <select v-model="newUser.userType" 
+                                    required
+                                    @change="handleUserTypeChange"
+                                    class="w-full border rounded-md px-3 py-2 text-sm">
+                                <option value="account_holder">Account Holder</option>
+                                <option value="team_member">Team Member</option>
+                                <option value="user">User</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Account ID (for team members) -->
+                        <div v-if="newUser.userType === 'team_member'">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Account ID *</label>
+                            <input v-model="newUser.accountId" 
+                                   type="text" 
+                                   required
+                                   placeholder="Enter account holder ID"
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                            <p class="text-xs text-gray-500 mt-1">ID of the account holder this team member belongs to</p>
+                        </div>
+                        
+                        <!-- Account Type -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Account Type *</label>
+                            <select v-model="newUser.accountType" 
+                                    required
+                                    @change="handleAccountTypeChange"
+                                    class="w-full border rounded-md px-3 py-2 text-sm">
+                                <option value="reg_client">Regular Client (Subscription Required)</option>
+                                <option value="eda">EDA (No Subscription)</option>
+                                <option value="app_owner">App Owner (No Subscription)</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Subscription Status -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Subscription Status *</label>
+                            <select v-model="newUser.subscriptionStatus" 
+                                    required
+                                    :disabled="newUser.accountType === 'eda' || newUser.accountType === 'app_owner'"
+                                    class="w-full border rounded-md px-3 py-2 text-sm">
+                                <option value="none">None</option>
+                                <option value="trial">Trial</option>
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                            </select>
+                            <p v-if="newUser.accountType === 'eda' || newUser.accountType === 'app_owner'" 
+                               class="text-xs text-gray-500 mt-1">Subscription status is automatically set to 'none' for EDA and App Owner accounts</p>
+                        </div>
+                        
+                        <!-- Verification Status -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email Verified</label>
+                            <select v-model="newUser.isVerified" 
+                                    class="w-full border rounded-md px-3 py-2 text-sm">
+                                <option :value="false">Not Verified</option>
+                                <option :value="true">Verified</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Company Information -->
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                            <input v-model="newUser.company" 
+                                   type="text" 
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                        
+                        <!-- Token Balances -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">SMS Tokens</label>
+                            <input v-model.number="newUser.smsTokens" 
+                                   type="number" 
+                                   min="0"
+                                   value="0"
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Email Tokens</label>
+                            <input v-model.number="newUser.emailTokens" 
+                                   type="number" 
+                                   min="0"
+                                   value="0"
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">AI Tokens</label>
+                            <input v-model.number="newUser.aiTokens" 
+                                   type="number" 
+                                   min="0"
+                                   value="0"
+                                   class="w-full border rounded-md px-3 py-2 text-sm">
+                        </div>
+                    </div>
+                    
+                    <!-- Error Message -->
+                    <div v-if="createUserError" class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+                        {{ createUserError }}
+                    </div>
+                    
+                    <!-- Success Message -->
+                    <div v-if="createUserSuccess" class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded">
+                        {{ createUserSuccess }}
+                    </div>
+                    
+                    <!-- Form Actions -->
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" 
+                                @click="resetAddUserForm"
+                                class="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50 text-sm">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                :disabled="creatingUser"
+                                class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm">
+                            {{ creatingUser ? 'Creating...' : 'Create User' }}
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <!-- Search and Filter -->
+            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6">
+                <input v-model="search" 
+                       type="text" 
+                       class="border rounded-md px-3 py-2 w-full sm:flex-1 text-sm" 
+                       placeholder="Search users...">
+                <select v-model="filter" 
+                        class="border rounded-md px-3 py-2 w-full sm:w-auto text-sm">
+                    <option value="all">All Users</option>
+                    <option value="verified">Verified</option>
+                    <option value="unverified">Unverified</option>
+                </select>
+            </div>
+
+            <!-- Users Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email & Name</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role & ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SMS Tokens</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email Tokens</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">AI Tokens</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-if="paginatedUsers.length === 0">
+                            <td colspan="7" class="px-6 py-4 text-center text-gray-500">
+                                <div v-if="users.length === 0">Loading users...</div>
+                                <div v-else>No users found matching your search criteria.</div>
+                            </td>
+                        </tr>
+                        <tr v-for="user in paginatedUsers" :key="user.id">
+                            <td class="px-6 py-4">
+                                <div class="font-medium">{{ user.email || 'No Email' }}</div>
+                                <div v-if="user.firstName || user.lastName" class="text-sm text-gray-500">
+                                    {{ [user.firstName, user.lastName].filter(Boolean).join(' ') }}
+                                </div>
+                                <div v-if="user.company" class="text-sm text-gray-500">{{ user.company }}</div>
+                                <div v-if="user.userType === 'team_member'" class="text-xs text-blue-600 mt-1">
+                                    Team member of {{ getAccountName(user.accountId) }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-gray-500 text-xs">{{ user.id }}</div>
+                                <div :class="{
+                                    'px-2 py-1 text-xs rounded-full inline-block mt-1': true,
+                                    'bg-red-100 text-red-800': user.userType === 'app_owner',
+                                    'bg-purple-100 text-purple-800': user.userType === 'account_holder',
+                                    'bg-blue-100 text-blue-800': user.userType === 'team_member',
+                                    'bg-gray-100 text-gray-800': !user.userType || user.userType === 'user'
+                                }">
+                                    {{ user.userType === 'app_owner' ? 'App Owner' : 
+                                       user.userType === 'account_holder' ? 'Account Holder' : 
+                                       user.userType === 'team_member' ? 'Team Member' : 
+                                       'User' }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div>
+                                    <span :class="{
+                                        'px-2 py-1 text-xs rounded-full': true,
+                                        'bg-green-100 text-green-800': user.isVerified,
+                                        'bg-yellow-100 text-yellow-800': !user.isVerified
+                                    }">
+                                        {{ user.isVerified ? 'Verified' : 'Unverified' }}
+                                    </span>
+                                </div>
+                                <div v-if="user.lastLoginAt" class="text-xs text-gray-500 mt-1">
+                                    Last login: {{ new Date(user.lastLoginAt).toLocaleDateString() }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div>{{ formatTokenValue(user.smsTokens) }}</div>
+                                <div v-if="user.phone" class="text-xs text-gray-500">{{ user.phone }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ formatTokenValue(user.emailTokens) }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap">{{ formatTokenValue(user.aiTokens) }}</td>
+                            <td class="px-6 py-4 whitespace-nowrap space-x-2">
+                                <button @click="adjustTokens(user)" 
+                                        class="text-indigo-600 hover:text-indigo-900">
+                                    Set Tokens
+                                </button>
+                                <button @click="deleteUser(user)" 
+                                        class="text-red-600 hover:text-red-900">
+                                    Delete
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Users Pagination -->
+            <div v-if="showUsersPagination" class="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div class="text-sm text-gray-700">
+                    Showing {{ ((usersCurrentPage - 1) * usersPageSize) + 1 }} to
+                    {{ Math.min(usersCurrentPage * usersPageSize, filteredUsers.length) }} of
+                    {{ filteredUsers.length }} users
+                </div>
+                <div class="flex gap-2">
+                    <button @click="usersCurrentPage = Math.max(1, usersCurrentPage - 1)"
+                            :disabled="usersCurrentPage === 1"
+                            class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                        Previous
+                    </button>
+                    <button @click="usersCurrentPage = Math.min(usersTotalPages, usersCurrentPage + 1)"
+                            :disabled="usersCurrentPage === usersTotalPages"
+                            class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Assign phone number to account (app owner only) -->
+        <div v-if="isAppOwner" class="bg-white shadow rounded-lg p-6 mt-6">
+            <h2 class="text-xl font-semibold mb-4">Assign Phone Number to Account</h2>
+            <p class="text-sm text-gray-600 mb-4">Purchase numbers in Sender Settings, then assign them to account holders here.</p>
+            <div class="flex flex-wrap items-end gap-4">
+                <div class="min-w-[200px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Account</label>
+                    <select v-model="assignAccountId"
+                            class="w-full border rounded-md px-3 py-2 text-sm">
+                        <option value="">Select account holder</option>
+                        <option v-for="u in accountHolders" :key="u.id" :value="u.id">
+                            {{ u.email || u.personalInfo?.firstName }} ({{ u.id }})
+                        </option>
+                    </select>
+                </div>
+                <div class="min-w-[200px]">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Phone number</label>
+                    <select v-model="assignPhoneNumber"
+                            class="w-full border rounded-md px-3 py-2 text-sm">
+                        <option value="">Select number</option>
+                        <option v-for="n in assignablePhoneNumbers" :key="n.id" :value="n.number">
+                            {{ n.number }}
+                        </option>
+                    </select>
+                </div>
+                <button type="button"
+                        :disabled="assignSubmitting || !assignAccountId || !assignPhoneNumber"
+                        @click="assignPhoneNumberToAccount"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium">
+                    {{ assignSubmitting ? 'Assigning…' : 'Assign' }}
+                </button>
+            </div>
+            <p v-if="assignError" class="mt-2 text-sm text-red-600">{{ assignError }}</p>
+            <p v-if="assignSuccess" class="mt-2 text-sm text-green-600">{{ assignSuccess }}</p>
+            <p v-if="isAppOwner && assignablePhoneNumbers.length === 0" class="mt-2 text-sm text-amber-600">
+                No phone numbers available to assign. Add numbers in Sender Settings first.
+            </p>
+        </div>
+
+        <!-- Phone Number Subscriptions -->
+        <div class="bg-white shadow rounded-lg p-6 mt-6">
+            <h2 class="text-xl font-semibold mb-4">Phone Number Subscriptions</h2>
+            <p class="text-sm text-gray-500 mb-4">Allocated by Campaign Builder. Numbers are purchased and assigned by the app owner.</p>
+            
+            <!-- Phone Numbers Table -->
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone Number</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Cost</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Purchased Date</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr v-if="phoneNumbers.length === 0">
+                            <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                No phone number subscriptions found.
+                            </td>
+                        </tr>
+                        <tr v-for="phoneNumber in paginatedPhoneNumbers" :key="phoneNumber.id">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="font-medium">{{ phoneNumber.number }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div>{{ phoneNumber.userEmail || 'Unknown User' }}</div>
+                                <div class="text-xs text-gray-500">ID: {{ phoneNumber.userId }}</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                ${{ phoneNumber.monthlyPrice || '4.00' }} CAD
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {{ phoneNumber.purchasedAt ? new Date(phoneNumber.purchasedAt).toLocaleDateString() : 'Unknown' }}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span :class="{
+                                    'px-2 py-1 text-xs rounded-full': true,
+                                    'bg-green-100 text-green-800': phoneNumber.isDefault,
+                                    'bg-gray-100 text-gray-800': !phoneNumber.isDefault
+                                }">
+                                    {{ phoneNumber.isDefault ? 'Default' : 'Active' }}
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Phone Numbers Pagination -->
+            <div v-if="showPhoneNumbersPagination" class="mt-3 flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div class="text-sm text-gray-700">
+                    Showing {{ ((phoneNumbersCurrentPage - 1) * phoneNumbersPageSize) + 1 }} to
+                    {{ Math.min(phoneNumbersCurrentPage * phoneNumbersPageSize, phoneNumbers.length) }} of
+                    {{ phoneNumbers.length }} phone numbers
+                </div>
+                <div class="flex gap-2">
+                    <button @click="phoneNumbersCurrentPage = Math.max(1, phoneNumbersCurrentPage - 1)"
+                            :disabled="phoneNumbersCurrentPage === 1"
+                            class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                        Previous
+                    </button>
+                    <button @click="phoneNumbersCurrentPage = Math.min(phoneNumbersTotalPages, phoneNumbersCurrentPage + 1)"
+                            :disabled="phoneNumbersCurrentPage === phoneNumbersTotalPages"
+                            class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                        Next
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Token Adjustment Modal -->
+        <div v-if="showTokenModal" class="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
+            <div class="bg-white rounded-lg p-6 max-w-md w-full">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-medium">Set Tokens for {{ selectedUser?.email }}</h3>
+                    <button @click="closeTokenModal" class="text-gray-400 hover:text-gray-500">×</button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">SMS Tokens (Total)</label>
+                        <input v-model="tokenAdjustment.sms" 
+                               type="number" 
+                               min="0"
+                               max="100000"
+                               class="mt-1 block w-full border rounded-md px-3 py-2">
+                        <p class="mt-1 text-xs text-gray-500">Enter the total SMS tokens the user should have</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Email Tokens (Total)</label>
+                        <input v-model="tokenAdjustment.email" 
+                               type="number" 
+                               min="0"
+                               max="100000"
+                               class="mt-1 block w-full border rounded-md px-3 py-2">
+                        <p class="mt-1 text-xs text-gray-500">Enter the total email tokens the user should have</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">AI Tokens (Total)</label>
+                        <input v-model="tokenAdjustment.ai" 
+                               type="number" 
+                               min="0"
+                               max="100000"
+                               class="mt-1 block w-full border rounded-md px-3 py-2">
+                        <p class="mt-1 text-xs text-gray-500">Enter the total AI tokens the user should have</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Reason</label>
+                        <textarea v-model="tokenAdjustment.reason" 
+                                  class="mt-1 block w-full border rounded-md px-3 py-2"
+                                  rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end space-x-3">
+                    <button @click="closeTokenModal" 
+                            class="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">
+                        Cancel
+                    </button>
+                    <button @click="saveTokenAdjustment" 
+                            class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue
+
+createApp({
+    data() {
+        return {
+            users: [],
+            search: '',
+            filter: 'all',
+            // Users pagination
+            usersCurrentPage: 1,
+            usersPageSize: 10,
+            showTokenModal: false,
+            selectedUser: null,
+            tokenAdjustment: {
+                sms: 0,
+                email: 0,
+                ai: 0,
+                reason: ''
+            },
+            phoneNumbers: [],
+            // Phone numbers pagination
+            phoneNumbersCurrentPage: 1,
+            phoneNumbersPageSize: 10,
+            contacts: [],
+            accounts: {},
+            // Add user form
+            showAddUserForm: false,
+            creatingUser: false,
+            createUserError: '',
+            createUserSuccess: '',
+            newUser: {
+                email: '',
+                password: '',
+                username: '',
+                firstName: '',
+                lastName: '',
+                company: '',
+                userType: 'account_holder',
+                accountType: 'reg_client',
+                subscriptionStatus: 'none',
+                isVerified: false,
+                smsTokens: 0,
+                emailTokens: 0,
+                aiTokens: 0,
+                accountId: null
+            },
+            // Assign phone number (app owner only)
+            isAppOwner: <%= (typeof user !== 'undefined' && user && user.userType === 'app_owner') ? 'true' : 'false' %>,
+            assignablePhoneNumbers: [],
+            assignAccountId: '',
+            assignPhoneNumber: '',
+            assignSubmitting: false,
+            assignError: '',
+            assignSuccess: ''
+        }
+    },
+    computed: {
+        accountHolders() {
+            return this.users.filter(u => u.userType === 'account_holder') || [];
+        },
+        filteredUsers() {
+            const filtered = this.users.filter(user => {
+                const matchesSearch = !this.search || ((user.email || '').toLowerCase().includes(this.search.toLowerCase()));
+                const matchesFilter = this.filter === 'all' 
+                    || (this.filter === 'verified' && user.isVerified)
+                    || (this.filter === 'unverified' && !user.isVerified);
+                return matchesSearch && matchesFilter;
+            });
+            return filtered;
+        },
+        paginatedUsers() {
+            const start = (this.usersCurrentPage - 1) * this.usersPageSize;
+            const end = this.usersCurrentPage * this.usersPageSize;
+            return this.filteredUsers.slice(start, end);
+        },
+        usersTotalPages() {
+            return Math.max(1, Math.ceil(this.filteredUsers.length / this.usersPageSize));
+        },
+        showUsersPagination() {
+            return this.filteredUsers.length > this.usersPageSize;
+        },
+        paginatedPhoneNumbers() {
+            const start = (this.phoneNumbersCurrentPage - 1) * this.phoneNumbersPageSize;
+            const end = this.phoneNumbersCurrentPage * this.phoneNumbersPageSize;
+            return this.phoneNumbers.slice(start, end);
+        },
+        phoneNumbersTotalPages() {
+            return Math.max(1, Math.ceil(this.phoneNumbers.length / this.phoneNumbersPageSize));
+        },
+        showPhoneNumbersPagination() {
+            return this.phoneNumbers.length > this.phoneNumbersPageSize;
+        }
+    },
+    methods: {
+        getAuthHeaders() {
+            const token = localStorage.getItem('token');
+            return token ? { 'Authorization': 'Bearer ' + token } : {};
+        },
+        resetUsersPagination() {
+            this.usersCurrentPage = 1;
+        },
+        resetPhoneNumbersPagination() {
+            this.phoneNumbersCurrentPage = 1;
+        },
+        async loadUsers() {
+            try {
+                const response = await fetch('/api/admin/users', {
+                    credentials: 'include',
+                    headers: this.getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.users = Array.isArray(data) ? data : (data.users || []);
+                    
+                    this.resetUsersPagination();
+                    // Load phone numbers after users are loaded
+                    await this.loadPhoneNumbers();
+                    if (this.isAppOwner) await this.loadAssignablePhoneNumbers();
+                } else {
+                    console.error('Failed to load users, status:', response.status);
+                    const errorText = await response.text();
+                    console.error('Error response:', errorText);
+                }
+            } catch (error) {
+                console.error('Failed to load users:', error);
+            }
+        },
+        
+        async loadContacts() {
+            try {
+                // Load all contacts from all users for admin view
+                const response = await fetch('/api/admin/contacts', {
+                    credentials: 'include',
+                    headers: this.getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    this.contacts = await response.json();
+                }
+            } catch (error) {
+                console.error('Failed to load contacts:', error);
+            }
+        },
+        
+        async loadAccounts() {
+            try {
+                const response = await fetch('/api/admin/accounts', {
+                    credentials: 'include',
+                    headers: this.getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    const accountsList = await response.json();
+                    // Convert array to object for easy lookup
+                    this.accounts = {};
+                    accountsList.forEach(account => {
+                        this.accounts[account.id] = account;
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load accounts:', error);
+            }
+        },
+        
+        async loadPausedCampaigns() {
+            this.loadingPausedCampaigns = true;
+            try {
+                const response = await fetch('/api/admin/notifications?unreadOnly=false', {
+                    credentials: 'include',
+                    headers: this.getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    // Filter for paused campaign notifications
+                    this.pausedCampaigns = (data.notifications || []).filter(n => 
+                        n.type === 'campaign_paused'
+                    );
+                } else {
+                    console.error('Failed to load paused campaigns:', response.status);
+                }
+            } catch (error) {
+                console.error('Failed to load paused campaigns:', error);
+            } finally {
+                this.loadingPausedCampaigns = false;
+            }
+        },
+        
+        async markNotificationRead(notification) {
+            try {
+                const response = await fetch(`/api/admin/notifications/${notification.id}/read`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, this.getAuthHeaders()),
+                    body: JSON.stringify({
+                        accountId: notification.accountId
+                    })
+                });
+                
+                if (response.ok) {
+                    notification.read = true;
+                }
+            } catch (error) {
+                console.error('Failed to mark notification as read:', error);
+            }
+        },
+        
+        formatTimestamp(timestamp) {
+            if (!timestamp) return 'Unknown';
+            const date = new Date(timestamp);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        },
+        
+        getContactDisplayName(identifier) {
+            if (!identifier) return 'Unknown';
+
+            // Normalize identifier to a string phone/email value
+            let idCandidate = identifier;
+            if (Array.isArray(idCandidate)) {
+                idCandidate = idCandidate.find(v => !!v) ?? '';
+            } else if (typeof idCandidate === 'object') {
+                if (idCandidate && (idCandidate.phone || idCandidate.email)) {
+                    idCandidate = idCandidate.phone || idCandidate.email;
+                } else {
+                    // Unknown object shape; stringify safely
+                    idCandidate = '';
+                }
+            }
+
+            const idStr = String(idCandidate || '').trim();
+            if (!idStr) return 'Unknown';
+
+            // Try email match first
+            if (idStr.includes('@')) {
+                const contactByEmail = this.contacts.find(c => (c.email || '').toLowerCase() === idStr.toLowerCase());
+                if (contactByEmail) {
+                    return `${contactByEmail.firstName} ${contactByEmail.lastName} (${idStr})`;
+                }
+                return idStr;
+            }
+
+            // Clean the identifier as phone (remove +1, spaces, non-digits)
+            const cleanIdentifier = idStr.replace(/^\+?1?/, '').replace(/\D/g, '');
+
+            // Find contact by phone number (cleaned)
+            const contact = this.contacts.find(c => {
+                if (!c.phone) return false;
+                const cleanPhone = String(c.phone).replace(/^\+?1?/, '').replace(/\D/g, '');
+                return cleanPhone === cleanIdentifier;
+            });
+
+            if (contact) {
+                return `${contact.firstName} ${contact.lastName} (${idStr})`;
+            }
+
+            return idStr;
+        },
+        
+        adjustTokens(user) {
+            this.selectedUser = user;
+            this.tokenAdjustment = {
+                sms: this.formatTokenValue(user.smsTokens),
+                email: this.formatTokenValue(user.emailTokens),
+                ai: this.formatTokenValue(user.aiTokens),
+                reason: ''
+            };
+            this.showTokenModal = true;
+        },
+        
+        async saveTokenAdjustment() {
+            try {
+                // Client-side validation
+                const newSmsTokens = parseInt(this.tokenAdjustment.sms);
+                const newEmailTokens = parseInt(this.tokenAdjustment.email);
+                const newAiTokens = parseInt(this.tokenAdjustment.ai);
+                const reason = this.tokenAdjustment.reason.trim();
+                
+                if (isNaN(newSmsTokens) || isNaN(newEmailTokens) || isNaN(newAiTokens)) {
+                    alert('Please enter valid numbers for token amounts');
+                    return;
+                }
+                
+                if (newSmsTokens < 0 || newEmailTokens < 0 || newAiTokens < 0) {
+                    alert('Token amounts cannot be negative');
+                    return;
+                }
+                
+                if (newSmsTokens > 100000 || newEmailTokens > 100000 || newAiTokens > 100000) {
+                    alert('Token amounts cannot exceed 100,000');
+                    return;
+                }
+                
+                if (!reason || reason.length < 3) {
+                    alert('Please provide a reason (at least 3 characters)');
+                    return;
+                }
+                
+                // Check if any changes were made
+                const currentSmsTokens = this.formatTokenValue(this.selectedUser.smsTokens);
+                const currentEmailTokens = this.formatTokenValue(this.selectedUser.emailTokens);
+                const currentAiTokens = this.formatTokenValue(this.selectedUser.aiTokens);
+
+                if (newSmsTokens === currentSmsTokens && newEmailTokens === currentEmailTokens && newAiTokens === currentAiTokens) {
+                    alert('No changes detected. Please modify token amounts or cancel.');
+                    return;
+                }
+                
+                const response = await fetch('/api/admin/adjust-tokens', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, this.getAuthHeaders()),
+                    body: JSON.stringify({
+                        userId: this.selectedUser.id,
+                        smsTokens: newSmsTokens,
+                        emailTokens: newEmailTokens,
+                        aiTokens: newAiTokens,
+                        reason: reason
+                    })
+                });
+                
+                if (response.ok) {
+                    await this.loadUsers();
+                    this.closeTokenModal();
+                    alert('Tokens set successfully');
+                    
+                    // Update navigation token balances
+                    if (typeof updateTokenBalances === 'function') {
+                        await updateTokenBalances();
+                    }
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to adjust tokens');
+                }
+            } catch (error) {
+                alert(error.message);
+            }
+        },
+        
+        closeTokenModal() {
+            this.showTokenModal = false;
+            this.selectedUser = null;
+            this.tokenAdjustment = {
+                sms: 0,
+                email: 0,
+                ai: 0,
+                reason: ''
+            };
+        },
+        
+        async deleteUser(user) {
+            if (!confirm(`Are you sure you want to delete user ${user.email || 'No Email'} (ID: ${user.id})?`)) {
+                return;
+            }
+            
+            try {
+                // Ensure user.id is a valid string/number
+                const userId = String(user.id).trim();
+                if (!userId || !/^\d+$/.test(userId)) {
+                    alert(`Invalid user ID format: ${userId}`);
+                    return;
+                }
+                
+                const response = await fetch(`/api/admin/users/${userId}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: this.getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.users = this.users.filter(u => u.id !== user.id);
+                    alert('User deleted successfully');
+                    // Reload users to ensure UI is in sync
+                    await this.loadUsers();
+                } else {
+                    const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+                    throw new Error(errorData.error || `Failed to delete user: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error('Delete user error:', error);
+                alert(`Error deleting user: ${error.message}`);
+            }
+        },
+
+        async loadPhoneNumbers() {
+            try {
+                const response = await fetch('/api/admin/phone-numbers', {
+                    credentials: 'include',
+                    headers: this.getAuthHeaders()
+                });
+                
+                if (response.ok) {
+                    this.phoneNumbers = await response.json();
+                    this.resetPhoneNumbersPagination();
+                } else {
+                    console.error('Failed to load phone numbers, status:', response.status);
+                }
+            } catch (error) {
+                console.error('Failed to load phone numbers:', error);
+            }
+        },
+
+        async loadAssignablePhoneNumbers() {
+            try {
+                const response = await fetch('/api/admin/assignable-phone-numbers', {
+                    credentials: 'include',
+                    headers: this.getAuthHeaders()
+                });
+                if (response.ok) {
+                    this.assignablePhoneNumbers = await response.json();
+                } else {
+                    this.assignablePhoneNumbers = [];
+                }
+            } catch (error) {
+                console.error('Failed to load assignable phone numbers:', error);
+                this.assignablePhoneNumbers = [];
+            }
+        },
+
+        async assignPhoneNumberToAccount() {
+            this.assignError = '';
+            this.assignSuccess = '';
+            if (!this.assignAccountId || !this.assignPhoneNumber) {
+                this.assignError = 'Please select an account and a phone number.';
+                return;
+            }
+            this.assignSubmitting = true;
+            try {
+                const response = await fetch('/api/admin/numbers', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, this.getAuthHeaders()),
+                    body: JSON.stringify({
+                        userId: this.assignAccountId,
+                        number: this.assignPhoneNumber
+                    })
+                });
+                const data = await response.json().catch(() => ({}));
+                if (response.ok) {
+                    this.assignSuccess = 'Phone number assigned successfully.';
+                    this.assignAccountId = '';
+                    this.assignPhoneNumber = '';
+                    await this.loadPhoneNumbers();
+                    await this.loadAssignablePhoneNumbers();
+                } else {
+                    this.assignError = data.error || 'Failed to assign phone number.';
+                }
+            } catch (error) {
+                this.assignError = error.message || 'Failed to assign phone number.';
+            } finally {
+                this.assignSubmitting = false;
+            }
+        },
+
+        getUserEmail(userId) {
+            const user = this.users.find(u => u.id === userId);
+            return user ? (user.email || `No Email (ID: ${user.id})`) : 'Unknown User';
+        },
+        
+        formatTokenValue(tokens) {
+            if (typeof tokens === 'object' && tokens !== null) {
+                return tokens.count || 0;
+            }
+            return tokens || 0;
+        },
+        
+        getAccountName(accountId) {
+            // Find the account holder for this team member
+            const accountHolder = this.users.find(u => u.id === accountId && u.userType === 'account_holder');
+            if (accountHolder) {
+                return accountHolder.email || accountHolder.company || `Account ${accountId}`;
+            }
+            // Fallback: try to get account name from accounts data if available
+            if (this.accounts && this.accounts[accountId]) {
+                return this.accounts[accountId].name || `Account ${accountId}`;
+            }
+            return `Account ${accountId}`;
+        },
+        
+        handleUserTypeChange() {
+            // Reset accountId if user type changes away from team_member
+            if (this.newUser.userType !== 'team_member') {
+                this.newUser.accountId = null;
+            }
+        },
+        
+        handleAccountTypeChange() {
+            // Auto-set subscription status based on account type
+            if (this.newUser.accountType === 'eda' || this.newUser.accountType === 'app_owner') {
+                this.newUser.subscriptionStatus = 'none';
+            } else if (this.newUser.accountType === 'reg_client' && this.newUser.subscriptionStatus === 'none') {
+                // Default to trial for new reg_client accounts
+                this.newUser.subscriptionStatus = 'trial';
+            }
+        },
+        
+        resetAddUserForm() {
+            this.showAddUserForm = false;
+            this.createUserError = '';
+            this.createUserSuccess = '';
+            this.newUser = {
+                email: '',
+                password: '',
+                username: '',
+                firstName: '',
+                lastName: '',
+                company: '',
+                userType: 'account_holder',
+                accountType: 'reg_client',
+                subscriptionStatus: 'none',
+                isVerified: false,
+                smsTokens: 0,
+                emailTokens: 0,
+                aiTokens: 0,
+                accountId: null
+            };
+        },
+        
+        async createUser() {
+            this.creatingUser = true;
+            this.createUserError = '';
+            this.createUserSuccess = '';
+            
+            try {
+                // Validate required fields
+                if (!this.newUser.email || !this.newUser.password) {
+                    throw new Error('Email and password are required');
+                }
+                
+                if (this.newUser.userType === 'team_member' && !this.newUser.accountId) {
+                    throw new Error('Account ID is required for team members');
+                }
+                
+                // Prepare request body
+                const requestBody = {
+                    email: this.newUser.email.trim(),
+                    password: this.newUser.password,
+                    username: this.newUser.username.trim() || null,
+                    firstName: this.newUser.firstName.trim() || null,
+                    lastName: this.newUser.lastName.trim() || null,
+                    company: this.newUser.company.trim() || null,
+                    userType: this.newUser.userType,
+                    accountType: this.newUser.accountType,
+                    subscriptionStatus: this.newUser.subscriptionStatus,
+                    isVerified: this.newUser.isVerified,
+                    smsTokens: parseInt(this.newUser.smsTokens) || 0,
+                    emailTokens: parseInt(this.newUser.emailTokens) || 0,
+                    aiTokens: parseInt(this.newUser.aiTokens) || 0
+                };
+                
+                // Add accountId if team member
+                if (this.newUser.userType === 'team_member') {
+                    requestBody.accountId = this.newUser.accountId.trim();
+                }
+                
+                const response = await fetch('/api/admin/users/create', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: Object.assign({ 'Content-Type': 'application/json' }, this.getAuthHeaders()),
+                    body: JSON.stringify(requestBody)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    this.createUserSuccess = `User created successfully! Email: ${data.user.email}`;
+                    // Reload users list
+                    await this.loadUsers();
+                    // Reset form after 2 seconds
+                    setTimeout(() => {
+                        this.resetAddUserForm();
+                    }, 2000);
+                } else {
+                    throw new Error(data.error || 'Failed to create user');
+                }
+            } catch (error) {
+                console.error('Create user error:', error);
+                this.createUserError = error.message || 'Failed to create user. Please try again.';
+            } finally {
+                this.creatingUser = false;
+            }
+        }
+    },
+    async created() {
+        // Server already authenticated (page was rendered). Use cookies via credentials: 'include'; do not redirect on missing localStorage token.
+        await this.loadUsers();
+        await this.loadContacts();
+        await this.loadAccounts();
+    }
+}).mount('#app')
+</script> 

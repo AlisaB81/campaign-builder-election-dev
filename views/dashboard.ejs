@@ -1,0 +1,1302 @@
+<%- include('partials/nav') %>
+
+<% 
+// Use isElectionAccount from server if provided, otherwise calculate it
+if (typeof isElectionAccount === 'undefined') {
+  var isElectionAccount = (typeof user !== 'undefined' && user && (user.electionMode || user.accountType === 'election'));
+}
+%>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <div class="py-6 space-y-8">
+        <!-- Welcome Section -->
+        <div class="bg-white shadow rounded-lg p-8">
+            <% 
+            if (!isElectionAccount) { %>
+            <h1 class="text-2xl font-bold text-gray-900 mb-4">Welcome to Campaign Builder</h1>
+            <p class="text-gray-600 mb-6">Your all-in-one solution for managing and sending SMS and email campaigns.</p>
+            <% } else { %>
+            <h1 class="text-2xl font-bold text-gray-900 mb-4">Election Campaign Dashboard</h1>
+            <p class="text-gray-600 mb-6">Manage your election campaign operations, voter interactions, and vote tracking.</p>
+            <% } %>
+            
+            <!-- Quick Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-indigo-50 rounded-lg p-6">
+                    <div class="text-indigo-600 text-lg font-semibold mb-2">Available Tokens</div>
+                    <div class="flex justify-between">
+                        <span>SMS:</span>
+                        <span class="font-bold">{{ smsTokens }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Email:</span>
+                        <span class="font-bold">{{ emailTokens }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>AI Calls:</span>
+                        <span class="font-bold">{{ aiTokens }}</span>
+                    </div>
+                </div>
+                
+                <div class="bg-green-50 rounded-lg p-6">
+                    <div class="text-green-600 text-lg font-semibold mb-2">Contacts</div>
+                    <div class="flex justify-between">
+                        <span>Total Contacts:</span>
+                        <span class="font-bold">{{ totalContacts }}</span>
+                    </div>
+                </div>
+                
+                <div class="bg-blue-50 rounded-lg p-6">
+                    <div class="text-blue-600 text-lg font-semibold mb-2">Templates</div>
+                    <div class="flex justify-between">
+                        <span>Available Templates:</span>
+                        <span class="font-bold">{{ templates.length }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaign Success Reports -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Campaign Success Reports</h2>
+            </div>
+
+            <!-- Campaign Analytics Selector -->
+            <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                <h3 class="text-lg font-medium text-gray-900 mb-4">Campaign Analytics</h3>
+                
+                <!-- Filter Controls -->
+                <div class="flex flex-col lg:flex-row gap-4 mb-4">
+                    <!-- Campaign Type Filter -->
+                    <div class="w-full lg:w-1/3">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Filter by Type</label>
+                        <select v-model="selectedCampaignType" 
+                                @change="filterCampaigns"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                            <option value="">All Campaign Types</option>
+                            <option value="email">Email Campaigns</option>
+                            <option value="sms">SMS Campaigns</option>
+                            <option value="voice">AI Voice Campaigns</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Campaign Selection -->
+                    <div class="w-full lg:w-2/3">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Select Campaign</label>
+                        <select v-model="selectedCampaignId" 
+                                @change="loadCampaignAnalytics"
+                                class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                            <option value="">Select a campaign</option>
+                            <option v-for="campaign in filteredCampaigns" :key="campaign.id" :value="campaign.id">
+                                {{ campaign.name }} ({{ new Date(campaign.timestamp).toLocaleDateString() }}) - {{ campaign.totalRecipients }} contacts - {{ getCampaignTypeLabel(campaign.type) }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Campaign Type Summary -->
+                <div v-if="groupedCampaigns.length > 0" class="mb-4 p-3 bg-white rounded border">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">Campaign Summary</h4>
+                    <div class="flex flex-wrap gap-4 text-sm">
+                        <span class="flex items-center">
+                            <span class="w-3 h-3 bg-blue-500 rounded-full mr-2"></span>
+                            <span class="text-gray-600">Email: {{ getCampaignTypeCount('email') }}</span>
+                        </span>
+                        <span class="flex items-center">
+                            <span class="w-3 h-3 bg-green-500 rounded-full mr-2"></span>
+                            <span class="text-gray-600">SMS: {{ getCampaignTypeCount('sms') }}</span>
+                        </span>
+                        <span class="flex items-center">
+                            <span class="w-3 h-3 bg-purple-500 rounded-full mr-2"></span>
+                            <span class="text-gray-600">AI Voice: {{ getCampaignTypeCount('voice') }}</span>
+                        </span>
+                        <span class="flex items-center">
+                            <span class="w-3 h-3 bg-gray-500 rounded-full mr-2"></span>
+                            <span class="text-gray-600">Total: {{ groupedCampaigns.length }}</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button @click="clearCampaignSelection"
+                            class="w-full sm:w-auto px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-50">
+                        Clear Selection
+                    </button>
+                    <button @click="refreshCampaignList"
+                            class="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
+                        Refresh List
+                    </button>
+                </div>
+                
+                <!-- Individual Campaign Analytics -->
+                <div v-if="selectedCampaign" class="mt-6 p-4 bg-white rounded border">
+                    <div class="flex justify-between items-center mb-4">
+                        <h4 class="text-lg font-medium text-gray-900">Campaign Analytics</h4>
+                        <button @click="clearCampaignSelection" 
+                                class="text-gray-500 hover:text-gray-700">
+                            ✕
+                        </button>
+                    </div>
+                    
+                    <!-- Campaign Info -->
+                    <div class="mb-4 p-3 bg-blue-50 rounded">
+                        <div class="text-sm text-gray-600">
+                            <div><strong>Campaign:</strong> {{ selectedCampaign.subject || selectedCampaign.body }}</div>
+                            <div><strong>Type:</strong> {{ getCampaignTypeLabel(selectedCampaign.type) }}</div>
+                            <div><strong>Sent:</strong> {{ new Date(selectedCampaign.timestamp || selectedCampaign.dateSent).toLocaleString() }}</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Analytics Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+                        <div class="bg-blue-50 rounded-lg p-3">
+                            <div class="text-blue-600 text-sm font-medium">Total Attempted</div>
+                            <div class="text-xl font-bold text-blue-900">{{ selectedCampaign.totalAttempted || selectedCampaign.recipientCount }}</div>
+                        </div>
+                        <div class="bg-green-50 rounded-lg p-3">
+                            <div class="text-green-600 text-sm font-medium">Delivered</div>
+                            <div class="text-xl font-bold text-green-900">{{ selectedCampaign.deliveredCount !== null ? selectedCampaign.deliveredCount : 'N/A' }}</div>
+                        </div>
+                        <div class="bg-yellow-50 rounded-lg p-3">
+                            <div class="text-yellow-600 text-sm font-medium">
+                                <span v-if="selectedCampaign.type === 'voice'">Answered</span>
+                                <span v-else>Opened</span>
+                            </div>
+                            <div class="text-xl font-bold text-yellow-900">
+                                <span v-if="selectedCampaign.type === 'voice'">{{ selectedCampaign.deliveredCount !== null ? selectedCampaign.deliveredCount : 'N/A' }}</span>
+                                <span v-else-if="selectedCampaign.type === 'sms'">N/A</span>
+                                <span v-else>{{ selectedCampaign.opens !== null ? selectedCampaign.opens : 'N/A' }}</span>
+                            </div>
+                        </div>
+                        <div class="bg-red-50 rounded-lg p-3">
+                            <div class="text-red-600 text-sm font-medium">Bounced/Failed</div>
+                            <div class="text-xl font-bold text-red-900">{{ selectedCampaign.bouncedCount !== null ? selectedCampaign.bouncedCount : (selectedCampaign.failedCount !== null ? selectedCampaign.failedCount : 'N/A') }}</div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Unsubscribe Overview -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Unsubscribe Overview</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gray-50 rounded-lg p-4">
+                    <div class="text-gray-600 text-sm font-medium mb-1">Total Contacts</div>
+                    <div class="text-2xl font-bold text-gray-900">{{ unsubscribeStats.totalContacts || 0 }}</div>
+                </div>
+                <div class="bg-red-50 rounded-lg p-4">
+                    <div class="text-red-600 text-sm font-medium mb-1">Email Unsubscribes</div>
+                    <div class="text-2xl font-bold text-red-900">{{ unsubscribeStats.emailUnsubscribes || 0 }}</div>
+                    <div class="text-xs text-red-600 mt-1" v-if="unsubscribeStats.totalContacts > 0">
+                        ({{ ((unsubscribeStats.emailUnsubscribes || 0) / unsubscribeStats.totalContacts * 100).toFixed(1) }}%)
+                    </div>
+                </div>
+                <div class="rounded-lg p-4" style="background-color: #fff7ed;">
+                    <div class="text-sm font-medium mb-1" style="color: #ea580c;">SMS Unsubscribes</div>
+                    <div class="text-2xl font-bold" style="color: #7c2d12;">{{ unsubscribeStats.smsUnsubscribes || 0 }}</div>
+                    <div class="text-xs mt-1" style="color: #ea580c;" v-if="unsubscribeStats.totalContacts > 0">
+                        ({{ ((unsubscribeStats.smsUnsubscribes || 0) / unsubscribeStats.totalContacts * 100).toFixed(1) }}%)
+                    </div>
+                </div>
+                <div class="rounded-lg p-4" style="background-color: #f5f3ff;">
+                    <div class="text-sm font-medium mb-1" style="color: #7c3aed;">Voice Unsubscribes</div>
+                    <div class="text-2xl font-bold" style="color: #4c1d95;">{{ unsubscribeStats.voiceUnsubscribes || 0 }}</div>
+                    <div class="text-xs mt-1" style="color: #7c3aed;" v-if="unsubscribeStats.totalContacts > 0">
+                        ({{ ((unsubscribeStats.voiceUnsubscribes || 0) / unsubscribeStats.totalContacts * 100).toFixed(1) }}%)
+                    </div>
+                </div>
+            </div>
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <div class="text-gray-600 text-sm font-medium mb-1">All Channels Blocked</div>
+                <div class="text-2xl font-bold text-gray-900">{{ unsubscribeStats.allChannelsBlocked || 0 }}</div>
+                <div class="text-xs text-gray-600 mt-1" v-if="unsubscribeStats.totalContacts > 0">
+                    ({{ ((unsubscribeStats.allChannelsBlocked || 0) / unsubscribeStats.totalContacts * 100).toFixed(1) }}%)
+                </div>
+            </div>
+            <!-- Header and Download Controls -->
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <h3 class="text-lg font-medium text-gray-900">All Unsubscribers</h3>
+                <button @click="downloadUnsubscribersCSV" 
+                        class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded hover:bg-indigo-700">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                    Download CSV
+                </button>
+            </div>
+            
+            <div v-if="groupedUnsubscribes.length > 0">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Name/Email</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Channels</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                                <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr v-for="unsub in paginatedGroupedUnsubscribes" :key="unsub.key">
+                                <td class="px-4 py-2 text-sm text-gray-900">{{ unsub.contactName || unsub.email || 'Unknown' }}</td>
+                                <td class="px-4 py-2 text-sm">
+                                    <div class="flex flex-wrap gap-1">
+                                        <span v-if="unsub.channels.includes('email')"
+                                              class="px-2 py-1 rounded-full text-xs font-medium"
+                                              style="background-color: #fee2e2; color: #991b1b;">
+                                            EMAIL
+                                        </span>
+                                        <span v-if="unsub.channels.includes('sms')"
+                                              class="px-2 py-1 rounded-full text-xs font-medium"
+                                              style="background-color: #ffedd5; color: #9a3412;">
+                                            SMS
+                                        </span>
+                                        <span v-if="unsub.channels.includes('voice')"
+                                              class="px-2 py-1 rounded-full text-xs font-medium"
+                                              style="background-color: #ede9fe; color: #5b21b6;">
+                                            VOICE
+                                        </span>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-2 text-sm text-gray-600">{{ unsub.latestDate }}</td>
+                                <td class="px-4 py-2 text-sm text-gray-600">{{ unsub.reason || 'Not specified' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Unsubscribe Pagination -->
+                <div v-if="showUnsubscribesPagination" class="mt-4 flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <div class="text-sm text-gray-700">
+                        Showing {{ ((unsubscribesCurrentPage - 1) * unsubscribesPageSize) + 1 }} to
+                        {{ Math.min(unsubscribesCurrentPage * unsubscribesPageSize, groupedUnsubscribes.length) }} of
+                        {{ groupedUnsubscribes.length }} unsubscribers
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="unsubscribesCurrentPage = Math.max(1, unsubscribesCurrentPage - 1)"
+                                :disabled="unsubscribesCurrentPage === 1"
+                                class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                            Previous
+                        </button>
+                        <button @click="unsubscribesCurrentPage = Math.min(unsubscribesTotalPages, unsubscribesCurrentPage + 1)"
+                                :disabled="unsubscribesCurrentPage === unsubscribesTotalPages"
+                                class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div v-else class="text-center py-8 text-gray-500">
+                <p>No unsubscribers yet</p>
+                <p class="text-sm mt-2">Upload a CSV file to add unsubscribers</p>
+            </div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Recent Activity</h2>
+            <div class="space-y-4">
+                <div v-for="activity in recentActivityVisible" :key="activity.id" 
+                     class="flex items-center justify-between py-3 border-b last:border-0">
+                    <div class="flex items-center">
+                        <span :class="[
+                            'w-2 h-2 rounded-full mr-3',
+                            activity.type === 'campaign' ? 'bg-blue-500' : 
+                            activity.type === 'purchase' ? 'bg-green-500' : 'bg-red-500'
+                        ]"></span>
+                        <div>
+                            <div class="font-medium">
+                                {{ activity.description }}
+                            </div>
+                            <div class="text-sm text-gray-500">
+                                {{ new Date(activity.timestamp).toLocaleString() }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-500">
+                        {{ activity.tokenInfo }}
+                    </div>
+                </div>
+                <div class="mt-4 flex justify-center" v-if="hasMoreActivity">
+                    <button @click="loadMoreActivity" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Load more</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Start Guide -->
+        <div class="mb-12">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Quick Start Guide</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Configure Settings -->
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <span class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-600 text-white text-xl font-bold">
+                                    1
+                                </span>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Configure Sender Settings</h3>
+                                <p class="mt-2 text-sm text-gray-500">
+                                    <% if (typeof user !== 'undefined' && user && user.userType === 'app_owner') { %>
+                                    Purchase phone numbers for SMS and verify email senders. Assign numbers to accounts from Admin &gt; User Management.
+                                    <a href="/my-numbers" class="text-indigo-600 hover:text-indigo-800">Sender Settings →</a>
+                                    <% } else { %>
+                                    Phone numbers are assigned by the app owner. Contact your administrator or go to Admin &gt; User Management to request one.
+                                    <% } %>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Purchase Tokens -->
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <span class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-600 text-white text-xl font-bold">
+                                    2
+                                </span>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Purchase Tokens</h3>
+                                <p class="mt-2 text-sm text-gray-500">
+                                    Buy SMS and email tokens to start sending messages.
+                                    <a href="/my-tokens" class="text-indigo-600 hover:text-indigo-800">Buy tokens →</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Add Contacts -->
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <span class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-600 text-white text-xl font-bold">
+                                    3
+                                </span>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Add Contacts</h3>
+                                <p class="mt-2 text-sm text-gray-500">
+                                    Import your contacts or add them manually to start building your list.
+                                    <a href="/contact-manager" class="text-indigo-600 hover:text-indigo-800">Manage contacts →</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Send Messages -->
+                <div class="bg-white overflow-hidden shadow rounded-lg">
+                    <div class="p-5">
+                        <div class="flex items-center">
+                            <div class="flex-shrink-0">
+                                <span class="flex items-center justify-center h-12 w-12 rounded-md bg-indigo-600 text-white text-xl font-bold">
+                                    4
+                                </span>
+                            </div>
+                            <div class="ml-4">
+                                <h3 class="text-lg font-medium text-gray-900">Send Messages!</h3>
+                                <p class="mt-2 text-sm text-gray-500">
+                                    Start sending SMS or email messages to your contacts.
+                                    <a href="/messages" class="text-indigo-600 hover:text-indigo-800">Send messages →</a>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Help Tickets Section -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-semibold text-gray-900">Support Tickets</h2>
+                <button @click="refreshHelpTickets" 
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm">
+                    Refresh
+                </button>
+            </div>
+            
+            <!-- Help Tickets List -->
+            <div v-if="helpTickets.length === 0" class="text-center py-8 text-gray-500">
+                <svg class="mx-auto h-12 w-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p>No support tickets yet. Click the help button in the navigation to submit a ticket.</p>
+            </div>
+            
+            <div v-else class="space-y-4">
+                <div v-for="ticket in paginatedHelpTickets" :key="ticket.ticketNumber" 
+                     class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-start justify-between">
+                        <div class="flex-1">
+                            <div class="flex items-center space-x-3 mb-2">
+                                <h3 class="text-lg font-medium text-gray-900">{{ ticket.ticketNumber }}</h3>
+                                <span :class="{
+                                    'px-2 py-1 text-xs font-medium rounded-full': true,
+                                    'bg-red-100 text-red-800': ticket.status === 'Open',
+                                    'bg-yellow-100 text-yellow-800': ticket.status === 'In Progress',
+                                    'bg-green-100 text-green-800': ticket.status === 'Closed'
+                                }">
+                                    {{ ticket.status }}
+                                </span>
+                            </div>
+                            
+                            <div class="text-sm text-gray-600 mb-2">
+                                <strong>Page:</strong> {{ ticket.page }}
+                            </div>
+                            
+                            <div class="text-sm text-gray-600 mb-3">
+                                <strong>Submitted:</strong> {{ formatDate(ticket.createdAt) }}
+                            </div>
+                            
+                            <div class="bg-gray-50 rounded-md p-3 mb-3">
+                                <h4 class="text-sm font-medium text-gray-700 mb-2">Your Question:</h4>
+                                <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ ticket.message }}</p>
+                            </div>
+                            
+                            <!-- Admin Response -->
+                            <div v-if="ticket.adminReply" class="bg-blue-50 rounded-md p-3">
+                                <h4 class="text-sm font-medium text-blue-700 mb-2">Admin Response:</h4>
+                                <p class="text-sm text-blue-600 whitespace-pre-wrap">{{ ticket.adminReply }}</p>
+                                <div v-if="ticket.repliedAt" class="text-xs text-blue-500 mt-2">
+                                    Replied: {{ formatDate(ticket.repliedAt) }}
+                                </div>
+                            </div>
+                            
+                            <div v-else-if="ticket.status === 'Open'" class="bg-yellow-50 rounded-md p-3">
+                                <p class="text-sm text-yellow-700">
+                                    <svg class="inline w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    Your ticket is being reviewed by our support team.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- Delete Button -->
+                        <div class="ml-4">
+                            <button @click="deleteHelpTicket(ticket.ticketNumber)"
+                                    class="text-red-600 hover:text-red-800 p-2 rounded-md hover:bg-red-50 transition-colors"
+                                    title="Delete ticket">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <div v-if="showHelpTicketsPagination" class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-2">
+                    <div class="text-sm text-gray-700">
+                        Showing {{ ((helpTicketsCurrentPage - 1) * helpTicketsPageSize) + 1 }} to
+                        {{ Math.min(helpTicketsCurrentPage * helpTicketsPageSize, helpTickets.length) }} of
+                        {{ helpTickets.length }} tickets
+                    </div>
+                    <div class="flex gap-2">
+                        <button @click="helpTicketsCurrentPage = Math.max(1, helpTicketsCurrentPage - 1)"
+                                :disabled="helpTicketsCurrentPage === 1"
+                                class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                            Previous
+                        </button>
+                        <button @click="helpTicketsCurrentPage = Math.min(helpTicketsTotalPages, helpTicketsCurrentPage + 1)"
+                                :disabled="helpTicketsCurrentPage === helpTicketsTotalPages"
+                                class="px-3 py-1 border rounded text-sm hover:bg-gray-50 disabled:opacity-50">
+                            Next
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- Load Utilities - Load before Vue app to ensure API is available -->
+<script src="/js/utils/api.js"></script>
+<script>
+// Ensure API is loaded before Vue app initializes
+if (typeof API === 'undefined') {
+    console.error('API utility failed to load');
+}
+</script>
+
+<script>
+const { createApp } = Vue
+
+createApp({
+    data() {
+        return {
+            smsTokens: 0,
+            emailTokens: 0,
+            aiTokens: 0,
+            totalContacts: 0,
+            templates: [],
+            recentTransactions: [],
+            recentActivity: [],
+            allCampaigns: [],
+            helpTickets: [],
+            // Help tickets pagination
+            helpTicketsCurrentPage: 1,
+            helpTicketsPageSize: 3,
+            // Unsubscribe pagination
+            unsubscribesCurrentPage: 1,
+            unsubscribesPageSize: 10,
+            groupedCampaigns: [],
+            filteredCampaigns: [],
+            selectedCampaignId: '',
+            selectedCampaignType: '',
+            selectedCampaign: null,
+            // Pagination state
+            campaignsPage: 1,
+            campaignsPageSize: 10,
+            activityPage: 1,
+            activityPageSize: 10,
+            // Unsubscribe stats
+            unsubscribeStats: {
+                totalContacts: 0,
+                emailUnsubscribes: 0,
+                smsUnsubscribes: 0,
+                voiceUnsubscribes: 0,
+                allChannelsBlocked: 0
+            },
+            recentUnsubscribes: [],
+            allUnsubscribes: [],
+            autoRefreshTimer: null,
+            autoRefreshIntervalMs: 60000,
+            refreshInFlight: false,
+            tokenTransactionLimit: 200
+        }
+    },
+    methods: {
+        async loadUserData() {
+            try {
+                // Load user data
+                const userData = await API.get('/api/user');
+                
+                // Handle token objects vs numbers
+                this.smsTokens = typeof userData.smsTokens === 'object' ? (userData.smsTokens.balance || 0) : (userData.smsTokens || 0);
+                this.emailTokens = typeof userData.emailTokens === 'object' ? (userData.emailTokens.balance || 0) : (userData.emailTokens || 0);
+                this.aiTokens = userData.aiTokens || 0;
+                
+                // Load comprehensive analytics
+                const analytics = await API.get('/api/analytics/dashboard');
+                this.totalContacts = analytics.totalContacts || 0;
+                this.templates = await API.get('/api/templates');
+                
+                // Load unsubscribe stats
+                await this.loadUnsubscribeStats();
+                
+                // Use analytics data for campaigns
+                this.allCampaigns = analytics.campaigns || [];
+                this.groupedCampaigns = this.groupCampaignsForDropdown(this.allCampaigns);
+                this.filteredCampaigns = this.groupedCampaigns; // Initialize with all campaigns
+                
+                this.recentTransactions = (userData.tokenTransactions || [])
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                    .slice(0, this.tokenTransactionLimit);
+                
+                // Create detailed activity logs
+                await this.createDetailedActivityLogs();
+
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            }
+        },
+
+        groupCampaignsForDropdown(campaigns) {
+            const groups = {};
+            
+            campaigns.forEach(campaign => {
+                const campaignName = campaign.subject || campaign.body || 'Untitled Campaign';
+                const campaignDate = new Date(campaign.timestamp || campaign.dateSent).toDateString();
+                const key = `${campaignName}-${campaign.type}-${campaignDate}`;
+                
+                if (!groups[key]) {
+                    groups[key] = {
+                        id: key, // Use the group key as ID
+                        name: campaignName,
+                        type: campaign.type,
+                        date: campaignDate,
+                        timestamp: campaign.timestamp || campaign.dateSent,
+                        campaigns: [],
+                        totalRecipients: 0,
+                        totalAttempted: 0,
+                        totalOpens: 0,
+                        totalDelivered: 0,
+                        totalBounced: 0,
+                        hasAnalyticsData: false
+                    };
+                }
+                
+                groups[key].campaigns.push(campaign);
+                groups[key].totalRecipients += campaign.recipientCount || 0;
+                groups[key].totalAttempted += campaign.totalAttempted || campaign.recipientCount || 0;
+                
+                // Check if any campaign in the group has analytics data
+                if (campaign.successfulSends !== null || campaign.failedSends !== null || 
+                    campaign.deliveredCount !== null || campaign.bouncedCount !== null || 
+                    (campaign.opens !== null && campaign.opens !== undefined && campaign.opens > 0)) {
+                    groups[key].hasAnalyticsData = true;
+                }
+                
+                // Sum up other metrics if available
+                if (campaign.opens !== null && campaign.opens !== undefined) {
+                    groups[key].totalOpens += Number(campaign.opens) || 0;
+                }
+                // Use successfulSends as delivered count (for email campaigns)
+                if (campaign.successfulSends !== null && campaign.successfulSends !== undefined) {
+                    groups[key].totalDelivered += campaign.successfulSends;
+                } else if (campaign.deliveredCount !== null) {
+                    groups[key].totalDelivered += campaign.deliveredCount;
+                }
+                // Use failedSends as bounced count (for email campaigns)
+                if (campaign.failedSends !== null && campaign.failedSends !== undefined) {
+                    groups[key].totalBounced += campaign.failedSends;
+                } else if (campaign.bouncedCount !== null) {
+                    groups[key].totalBounced += campaign.bouncedCount;
+                }
+            });
+            
+            // Sort groups by timestamp (newest first)
+            const sortedGroups = Object.values(groups).sort((a, b) => 
+                new Date(b.timestamp) - new Date(a.timestamp)
+            );
+            
+            return sortedGroups;
+        },
+        
+        async refreshCampaignList(showAlert = true) {
+            if (this.refreshInFlight) {
+                return;
+            }
+            this.refreshInFlight = true;
+            try {
+                await this.loadUserData();
+                this.campaignsPage = 1;
+                this.activityPage = 1;
+                if (showAlert) {
+                    alert('Dashboard refreshed successfully!');
+                }
+            } catch (error) {
+                console.error('Failed to refresh dashboard:', error);
+                if (showAlert) {
+                    alert('Failed to refresh dashboard.');
+                }
+            } finally {
+                this.refreshInFlight = false;
+            }
+        },
+        loadMoreCampaignGroups() {
+            this.campaignsPage++;
+        },
+        loadMoreActivity() {
+            this.activityPage++;
+        },
+        
+        async loadCampaignAnalytics() {
+            if (!this.selectedCampaignId) {
+                this.selectedCampaign = null;
+                return;
+            }
+            
+            try {
+                // Find the grouped campaign data
+                const groupedCampaign = this.groupedCampaigns.find(g => g.id === this.selectedCampaignId);
+                
+                if (groupedCampaign) {
+                    // For single campaigns, try to get detailed analytics first
+                    if (groupedCampaign.campaigns.length === 1) {
+                        try {
+                            const campaign = await API.get(`/api/campaigns/${groupedCampaign.campaigns[0].id}`);
+                            this.selectedCampaign = campaign;
+                            return;
+                        } catch (error) {
+                            console.error(`Failed to load individual campaign ${groupedCampaign.campaigns[0].id}:`, error);
+                            // Fall through to grouped campaign logic
+                        }
+                    }
+                    
+                    // Fetch detailed analytics for each campaign in the group
+                    const analyticsPromises = groupedCampaign.campaigns.map(async (campaign) => {
+                        try {
+                            return await API.get(`/api/campaigns/${campaign.id}`);
+                        } catch (error) {
+                            console.error(`Failed to load analytics for campaign ${campaign.id}:`, error);
+                            return campaign; // Fallback to original campaign data
+                        }
+                    });
+                    
+                    const detailedCampaigns = await Promise.all(analyticsPromises);
+                    
+                    // Aggregate the analytics data
+                    let totalOpens = 0;
+                    let totalDelivered = 0;
+                    let totalBounced = 0;
+                    let hasAnalyticsData = false;
+                    
+                    detailedCampaigns.forEach(campaign => {
+                        if (campaign.opens !== null && campaign.opens !== undefined) {
+                            const opensValue = Number(campaign.opens) || 0;
+                            totalOpens += opensValue;
+                            if (opensValue > 0) {
+                                hasAnalyticsData = true;
+                            }
+                        }
+                        // Use successfulSends as delivered count (for email campaigns)
+                        if (campaign.successfulSends !== null && campaign.successfulSends !== undefined) {
+                            totalDelivered += campaign.successfulSends;
+                            hasAnalyticsData = true;
+                        } else if (campaign.deliveredCount !== null && campaign.deliveredCount !== undefined) {
+                            totalDelivered += campaign.deliveredCount;
+                            hasAnalyticsData = true;
+                        }
+                        // Use failedSends as bounced count (for email campaigns)
+                        if (campaign.failedSends !== null && campaign.failedSends !== undefined) {
+                            totalBounced += campaign.failedSends;
+                            hasAnalyticsData = true;
+                        } else if (campaign.bouncedCount !== null && campaign.bouncedCount !== undefined) {
+                            totalBounced += campaign.bouncedCount;
+                            hasAnalyticsData = true;
+                        }
+                    });
+                    
+                    // Create a combined campaign object from the grouped data
+                    this.selectedCampaign = {
+                        id: groupedCampaign.id,
+                        type: groupedCampaign.type,
+                        subject: groupedCampaign.name,
+                        body: groupedCampaign.name,
+                        recipientCount: groupedCampaign.totalRecipients,
+                        totalAttempted: groupedCampaign.totalAttempted,
+                        timestamp: groupedCampaign.timestamp,
+                        opens: hasAnalyticsData ? totalOpens : null,
+                        deliveredCount: hasAnalyticsData ? totalDelivered : (groupedCampaign.totalDelivered || 0),
+                        bouncedCount: hasAnalyticsData ? totalBounced : (groupedCampaign.totalBounced || 0),
+                        campaignCount: groupedCampaign.campaigns.length
+                    };
+                    
+                } else {
+                    // Fallback to individual campaign API
+                    try {
+                        const campaign = await API.get(`/api/campaigns/${this.selectedCampaignId}`);
+                        this.selectedCampaign = campaign;
+                    } catch (error) {
+                        console.error('Failed to load individual campaign:', error);
+                        // If individual campaign API fails, use the grouped campaign data as fallback
+                        this.selectedCampaign = {
+                            id: groupedCampaign.id,
+                            type: groupedCampaign.type,
+                            subject: groupedCampaign.name,
+                            body: groupedCampaign.name,
+                            recipientCount: groupedCampaign.totalRecipients,
+                            totalAttempted: groupedCampaign.totalAttempted,
+                            timestamp: groupedCampaign.timestamp,
+                            deliveredCount: groupedCampaign.totalDelivered || 0,
+                            bouncedCount: groupedCampaign.totalBounced || 0,
+                            campaignCount: groupedCampaign.campaigns.length
+                        };
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load campaign analytics:', error);
+                alert('Failed to load campaign analytics.');
+            }
+        },
+        
+        clearCampaignSelection() {
+            this.selectedCampaignId = '';
+            this.selectedCampaign = null;
+        },
+        
+        filterCampaigns() {
+            if (!this.selectedCampaignType) {
+                // Show all campaigns if no type filter is selected
+                this.filteredCampaigns = this.groupedCampaigns;
+            } else {
+                // Filter campaigns by type
+                this.filteredCampaigns = this.groupedCampaigns.filter(campaign => 
+                    campaign.type === this.selectedCampaignType
+                );
+            }
+            
+            // Clear selection when filtering changes
+            this.selectedCampaignId = '';
+            this.selectedCampaign = null;
+        },
+        
+        async createDetailedActivityLogs() {
+            try {
+                const activities = [];
+                
+                // Group transactions by campaign name, type, and date
+                const groupedTransactions = this.groupTransactionsByCampaign();
+                
+                // Process grouped transactions
+                for (const group of groupedTransactions) {
+                    let activity = {
+                        id: group.id,
+                        timestamp: group.timestamp,
+                        type: group.type === 'usage' ? 'campaign' : 'purchase',
+                        description: '',
+                        tokenInfo: ''
+                    };
+                    
+                    if (group.type === 'usage') {
+                        if (group.campaignName) {
+                            // We have campaign data
+                            let campaignType = 'campaign';
+                            if (group.campaignType === 'email') campaignType = 'email campaign';
+                            else if (group.campaignType === 'sms') campaignType = 'SMS campaign';
+                            else if (group.campaignType === 'voice') campaignType = 'AI voice campaign';
+                            
+                            const campaignName = group.campaignName;
+                            const totalRecipients = group.totalRecipients;
+                            
+                            activity.description = `Sent ${campaignType} "${campaignName}" to ${totalRecipients} contact${totalRecipients > 1 ? 's' : ''}`;
+                            
+                            let tokenType = 'token';
+                            if (group.service === 'email') tokenType = 'email token';
+                            else if (group.service === 'sms') tokenType = 'SMS token';
+                            else if (group.service === 'ai') tokenType = 'AI token';
+                            
+                            activity.tokenInfo = `Used ${group.totalTokens} ${tokenType}${group.totalTokens > 1 ? 's' : ''}`;
+                        } else {
+                            // Fallback for transactions without campaign data
+                            activity.description = `Sent ${group.service || 'message'} to ${group.totalRecipients} recipient${group.totalRecipients > 1 ? 's' : ''}`;
+                            activity.tokenInfo = `Used ${group.totalTokens} ${group.service === 'email' ? 'email token' : group.service === 'sms' ? 'SMS token' : 'token'}${group.totalTokens > 1 ? 's' : ''}`;
+                        }
+                    } else {
+                        // Purchase transaction
+                        activity.description = `Purchased ${Math.abs(group.totalTokens)} ${group.service || 'token'}${Math.abs(group.totalTokens) > 1 ? 's' : ''}`;
+                        activity.tokenInfo = `+${Math.abs(group.totalTokens)} ${group.service || 'token'}${Math.abs(group.totalTokens) > 1 ? 's' : ''}`;
+                    }
+                    
+                    activities.push(activity);
+                }
+                
+                // Sort by timestamp (newest first) and take the most recent 10
+                this.recentActivity = activities
+                    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+                    .slice(0, 10);
+                    
+            } catch (error) {
+                console.error('Failed to create detailed activity logs:', error);
+            }
+        },
+        
+        groupTransactionsByCampaign() {
+            const groups = [];
+            const processedTransactionIds = new Set();
+            const MATCH_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+            const recentTransactions = this.recentTransactions || [];
+            
+            // First, group all campaigns by name, type, and date
+            const campaignGroups = this.groupAllCampaignsByNameAndDate();
+            
+            // Create groups from campaign data
+            for (const campaignGroup of campaignGroups) {
+                const totalRecipients = campaignGroup.reduce((sum, campaign) => sum + (campaign.recipientCount || 0), 0);
+                const firstCampaign = campaignGroup[0];
+                const campaignTimestamp = new Date(firstCampaign.timestamp || firstCampaign.dateSent).getTime();
+                const campaignService = firstCampaign.type === 'email' ? 'email' : 'sms';
+                
+                // Find all token transactions for this campaign (emails often deduct in batches)
+                const matchingTransactions = recentTransactions.filter(transaction => {
+                    if (!transaction || processedTransactionIds.has(transaction.id)) return false;
+                    if (transaction.type !== 'usage') return false;
+                    if (transaction.service !== campaignService) return false;
+                    
+                    const transactionTime = new Date(transaction.timestamp).getTime();
+                    const amount = Math.abs(Number(transaction.amount) || 0);
+                    
+                    if (amount === 0) return false;
+                    
+                    return Math.abs(transactionTime - campaignTimestamp) <= MATCH_WINDOW_MS;
+                });
+                
+                let actualTokensUsed = totalRecipients;
+                if (matchingTransactions.length > 0) {
+                    actualTokensUsed = matchingTransactions.reduce((sum, transaction) => {
+                        return sum + Math.abs(Number(transaction.amount) || 0);
+                    }, 0);
+                    matchingTransactions.forEach(transaction => processedTransactionIds.add(transaction.id));
+                }
+                
+                groups.push({
+                    id: `campaign-${firstCampaign.id}`,
+                    timestamp: firstCampaign.timestamp || firstCampaign.dateSent,
+                    type: 'usage',
+                    service: campaignService,
+                    campaignName: firstCampaign.subject || firstCampaign.body || 'Untitled Campaign',
+                    campaignType: firstCampaign.type,
+                    totalRecipients: totalRecipients,
+                    totalTokens: actualTokensUsed
+                });
+            }
+            
+            // Add purchase transactions (skip anything already processed)
+            for (const transaction of recentTransactions) {
+                if (processedTransactionIds.has(transaction.id)) {
+                    continue;
+                }
+                
+                if (transaction.type === 'purchase') {
+                    groups.push({
+                        id: transaction.id,
+                        timestamp: transaction.timestamp,
+                        type: 'purchase',
+                        service: transaction.service,
+                        totalTokens: Math.abs(Number(transaction.amount) || 0)
+                    });
+                }
+            }
+            
+            return groups;
+        },
+        
+        groupAllCampaignsByNameAndDate() {
+            const groups = {};
+            
+            // Group all campaigns by name, type, and date
+            this.allCampaigns.forEach(campaign => {
+                const campaignName = campaign.subject || campaign.body || 'Untitled Campaign';
+                const campaignDate = new Date(campaign.timestamp || campaign.dateSent).toDateString();
+                const key = `${campaignName}-${campaign.type}-${campaignDate}`;
+                
+                if (!groups[key]) {
+                    groups[key] = [];
+                }
+                groups[key].push(campaign);
+            });
+            
+            return Object.values(groups);
+        },
+        
+        isSameDate(timestamp1, timestamp2) {
+            const date1 = new Date(timestamp1).toDateString();
+            const date2 = new Date(timestamp2).toDateString();
+            return date1 === date2;
+        },
+        
+        getCampaignTypeLabel(type) {
+            switch(type) {
+                case 'email': return 'Email';
+                case 'sms': return 'SMS';
+                case 'voice': return 'AI Voice';
+                default: return 'Unknown';
+            }
+        },
+        
+        getCampaignTypeCount(type) {
+            return this.groupedCampaigns.filter(campaign => campaign.type === type).length;
+        },
+        
+        findMatchingCampaigns(transaction) {
+            const transactionTime = new Date(transaction.timestamp);
+            const transactionDate = transactionTime.toDateString();
+            
+            return this.allCampaigns.filter(campaign => {
+                const campaignTime = new Date(campaign.timestamp || campaign.dateSent);
+                const campaignDate = campaignTime.toDateString();
+                
+                // Check if same date and service type matches
+                return campaignDate === transactionDate && 
+                       campaign.type === (transaction.service === 'email' ? 'email' : 'sms');
+            });
+        },
+        
+        groupCampaignsByNameAndDate(campaigns) {
+            const groups = {};
+            
+            campaigns.forEach(campaign => {
+                const campaignName = campaign.subject || campaign.body || 'Untitled Campaign';
+                const key = `${campaignName}-${campaign.type}`;
+                
+                if (!groups[key]) {
+                    groups[key] = [];
+                }
+                groups[key].push(campaign);
+            });
+            
+            return Object.values(groups);
+        },
+        
+        findCampaignByTransaction(transaction) {
+            // Try to find a campaign that matches the transaction timestamp and amount
+            const transactionTime = new Date(transaction.timestamp);
+            
+            return this.allCampaigns.find(campaign => {
+                const campaignTime = new Date(campaign.timestamp || campaign.dateSent);
+                const timeDiff = Math.abs(transactionTime - campaignTime);
+                
+                // Check if the campaign was sent within 5 minutes of the transaction
+                // and has the same number of recipients as tokens used
+                return timeDiff < 5 * 60 * 1000 && 
+                       (campaign.recipientCount === Math.abs(transaction.amount) ||
+                        campaign.type === (transaction.service === 'email' ? 'email' : 'sms'));
+            });
+        },
+        
+        async loadHelpTickets() {
+            try {
+                const response = await fetch('/api/help-tickets', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    this.helpTickets = await response.json();
+                    this.resetHelpTicketsPagination();
+                } else {
+                    console.error('Failed to load help tickets:', response.status);
+                }
+            } catch (error) {
+                console.error('Error loading help tickets:', error);
+            }
+        },
+        
+        async refreshHelpTickets() {
+            await this.loadHelpTickets();
+        },
+        
+        formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        },
+        
+        async deleteHelpTicket(ticketNumber) {
+            if (!confirm(`Are you sure you want to delete ticket ${ticketNumber}? This action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/help-tickets/${ticketNumber}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    // Remove ticket from local array
+                    this.helpTickets = this.helpTickets.filter(ticket => ticket.ticketNumber !== ticketNumber);
+                    
+                    // Reset pagination if needed
+                    if (this.helpTicketsCurrentPage > this.helpTicketsTotalPages) {
+                        this.helpTicketsCurrentPage = Math.max(1, this.helpTicketsTotalPages);
+                    }
+                } else {
+                    throw new Error('Failed to delete ticket');
+                }
+            } catch (error) {
+                console.error('Error deleting ticket:', error);
+                alert('Failed to delete ticket. Please try again.');
+            }
+        },
+        
+        resetHelpTicketsPagination() {
+            this.helpTicketsCurrentPage = 1;
+        },
+        
+        resetUnsubscribesPagination() {
+            this.unsubscribesCurrentPage = 1;
+        },
+        
+        async loadUnsubscribeStats() {
+            try {
+                const stats = await API.get('/api/unsubscribe/stats');
+                this.unsubscribeStats = stats;
+                
+                // Load all unsubscribes
+                const log = await API.get('/api/unsubscribe/log');
+                
+                // Store all unsubscribes sorted by date (newest first)
+                this.allUnsubscribes = (log || []).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                // Also keep recent unsubscribes for backward compatibility
+                const thirtyDaysAgo = new Date();
+                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                this.recentUnsubscribes = this.allUnsubscribes.filter(unsub => {
+                    return new Date(unsub.timestamp) >= thirtyDaysAgo;
+                });
+                
+                this.resetUnsubscribesPagination();
+            } catch (error) {
+                console.error('Failed to load unsubscribe stats:', error);
+                // Set defaults if API fails
+                this.unsubscribeStats = {
+                    totalContacts: this.totalContacts,
+                    emailUnsubscribes: 0,
+                    smsUnsubscribes: 0,
+                    voiceUnsubscribes: 0,
+                    allChannelsBlocked: 0
+                };
+            }
+        },
+
+        startAutoRefresh() {
+            this.stopAutoRefresh();
+            this.autoRefreshTimer = setInterval(() => {
+                this.refreshCampaignList(false);
+            }, this.autoRefreshIntervalMs);
+        },
+
+        stopAutoRefresh() {
+            if (this.autoRefreshTimer) {
+                clearInterval(this.autoRefreshTimer);
+                this.autoRefreshTimer = null;
+            }
+        },
+        
+        downloadUnsubscribersCSV() {
+            if (this.groupedUnsubscribes.length === 0) {
+                alert('No unsubscribers to download');
+                return;
+            }
+            
+            // Create CSV content
+            const headers = ['Name', 'Email', 'Channels', 'Date', 'Reason'];
+            const rows = this.groupedUnsubscribes.map(unsub => [
+                unsub.contactName || '',
+                unsub.email || '',
+                unsub.channels.map(c => c.toUpperCase()).join('; '),
+                unsub.latestDate || '',
+                unsub.reason || 'Not specified'
+            ]);
+            
+            // Escape CSV values
+            const escapeCSV = (val) => {
+                if (val == null) return '';
+                const str = String(val);
+                if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                    return '"' + str.replace(/"/g, '""') + '"';
+                }
+                return str;
+            };
+            
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(row => row.map(escapeCSV).join(','))
+            ].join('\n');
+            
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'unsubscribers_' + new Date().toISOString().split('T')[0] + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+    },
+    computed: {
+        visibleCampaignGroups() {
+            const end = this.campaignsPage * this.campaignsPageSize;
+            return (this.groupedCampaigns || []).slice(0, end);
+        },
+        hasMoreCampaignGroups() {
+            return (this.groupedCampaigns || []).length > this.visibleCampaignGroups.length;
+        },
+        recentActivityVisible() {
+            const end = this.activityPage * this.activityPageSize;
+            return (this.recentActivity || []).slice(0, end);
+        },
+        hasMoreActivity() {
+            return (this.recentActivity || []).length > this.recentActivityVisible.length;
+        },
+        paginatedHelpTickets() {
+            const start = (this.helpTicketsCurrentPage - 1) * this.helpTicketsPageSize;
+            const end = this.helpTicketsCurrentPage * this.helpTicketsPageSize;
+            return this.helpTickets.slice(start, end);
+        },
+        helpTicketsTotalPages() {
+            return Math.max(1, Math.ceil(this.helpTickets.length / this.helpTicketsPageSize));
+        },
+        showHelpTicketsPagination() {
+            return this.helpTickets.length > this.helpTicketsPageSize;
+        },
+        groupedUnsubscribes() {
+            // Group unsubscribes by contact name or email
+            const grouped = {};
+            for (const unsub of this.allUnsubscribes) {
+                const key = (unsub.contactName || unsub.email || 'unknown').toLowerCase();
+                if (!grouped[key]) {
+                    grouped[key] = {
+                        key: key,
+                        contactName: unsub.contactName,
+                        email: unsub.email,
+                        channels: [],
+                        latestTimestamp: unsub.timestamp,
+                        reason: unsub.reason
+                    };
+                }
+                // Add channel if not already present
+                const channel = (unsub.channel || 'email').toLowerCase();
+                if (!grouped[key].channels.includes(channel)) {
+                    grouped[key].channels.push(channel);
+                }
+                // Update latest timestamp
+                if (unsub.timestamp && new Date(unsub.timestamp) > new Date(grouped[key].latestTimestamp)) {
+                    grouped[key].latestTimestamp = unsub.timestamp;
+                }
+            }
+            // Convert to array and sort by latest timestamp
+            return Object.values(grouped)
+                .map(g => ({
+                    ...g,
+                    latestDate: g.latestTimestamp ? new Date(g.latestTimestamp).toLocaleDateString() : 'N/A'
+                }))
+                .sort((a, b) => new Date(b.latestTimestamp) - new Date(a.latestTimestamp));
+        },
+        paginatedGroupedUnsubscribes() {
+            const start = (this.unsubscribesCurrentPage - 1) * this.unsubscribesPageSize;
+            const end = this.unsubscribesCurrentPage * this.unsubscribesPageSize;
+            return this.groupedUnsubscribes.slice(start, end);
+        },
+        paginatedUnsubscribes() {
+            const start = (this.unsubscribesCurrentPage - 1) * this.unsubscribesPageSize;
+            const end = this.unsubscribesCurrentPage * this.unsubscribesPageSize;
+            return this.allUnsubscribes.slice(start, end);
+        },
+        unsubscribesTotalPages() {
+            return Math.max(1, Math.ceil(this.groupedUnsubscribes.length / this.unsubscribesPageSize));
+        },
+        showUnsubscribesPagination() {
+            return this.groupedUnsubscribes.length > this.unsubscribesPageSize;
+        }
+    },
+    async created() {
+        // Ensure API utility is loaded
+        if (typeof API === 'undefined') {
+            console.error('API utility not loaded. Waiting...');
+            // Wait a bit for script to load
+            await new Promise(resolve => setTimeout(resolve, 100));
+            if (typeof API === 'undefined') {
+                console.error('API utility still not available');
+                return;
+            }
+        }
+        // Auth is cookie-based; server already validated for this page. Do NOT require localStorage token.
+        await this.loadUserData();
+        await this.loadHelpTickets();
+        this.startAutoRefresh();
+    },
+    unmounted() {
+        this.stopAutoRefresh();
+    }
+}).mount('#app')
+</script> 

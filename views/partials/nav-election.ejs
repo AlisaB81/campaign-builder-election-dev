@@ -1,0 +1,261 @@
+<div class="flex h-screen bg-gray-100">
+    <!-- Left Sidebar Navigation -->
+    <aside class="w-64 bg-white shadow-lg flex-shrink-0">
+        <!-- Logo/Header -->
+        <div class="h-16 flex items-center justify-center border-b border-gray-200">
+            <h1 class="text-xl font-bold text-indigo-600">Campaign Builder</h1>
+        </div>
+        
+        <!-- Navigation Menu -->
+        <nav class="mt-6 px-3" role="navigation" aria-label="Election navigation">
+            <div class="space-y-1">
+                <!-- Dashboard -->
+                <a href="/dashboard" 
+                   class="<%= path === '/dashboard' ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                    Dashboard
+                </a>
+                
+                <!-- Scrutineering / Vote Tracking -->
+                <a href="/election/scrutineering" 
+                   class="<%= path === '/election/scrutineering' || path.startsWith('/election/scrutineering') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Vote Tracking
+                </a>
+                
+                <!-- Voter Interactions -->
+                <a href="/election/interactions" 
+                   class="<%= path === '/election/interactions' || path.startsWith('/election/interactions') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Voter Interactions
+                </a>
+                
+                <!-- Election Lists -->
+                <a href="/election/lists" 
+                   class="<%= path === '/election/lists' || path.startsWith('/election/lists') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Lists
+                </a>
+                
+                <!-- Canvassing -->
+                <a href="/election/navigation" 
+                   class="<%= path === '/election/navigation' || path.startsWith('/election/navigation') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Navigation
+                </a>
+                
+                <!-- Contacts -->
+                <a href="/contact-manager" 
+                   class="<%= path === '/contact-manager' || path.startsWith('/contact-manager') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Contacts
+                </a>
+                
+                <!-- Messages -->
+                <a href="/messages" 
+                   class="<%= path.startsWith('/message') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    Messages
+                </a>
+                
+                <!-- Templates -->
+                <a href="/templates" 
+                   class="<%= path === '/templates' || path.startsWith('/templates') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                          flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                    <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    Templates
+                </a>
+                
+                <!-- Admin Section (if applicable) -->
+                <% if (user && (user.userType === 'app_owner' || (user.userType === 'account_holder' && user.isAdmin))) { %>
+                <div class="pt-4 mt-4 border-t border-gray-200">
+                    <p class="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Admin</p>
+                    <a href="/management" 
+                       class="<%= path === '/management' ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                              flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        User Management
+                    </a>
+                    <a href="/admin/help-tickets" 
+                       class="<%= path === '/admin/help-tickets' || path.startsWith('/admin/help-tickets') ? 'bg-indigo-50 text-indigo-700 border-indigo-500' : 'text-gray-700 hover:bg-gray-50 border-transparent' %> 
+                              flex items-center px-3 py-2 text-sm font-medium border-l-4">
+                        <svg class="mr-3 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Help Requests
+                        <span id="helpTicketsCountSidebar" class="ml-auto hidden">
+                            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                <span id="helpTicketsCountNumberSidebar">0</span>
+                            </span>
+                        </span>
+                    </a>
+                </div>
+                <% } %>
+            </div>
+        </nav>
+        
+        <!-- User Info & Actions (Bottom) -->
+        <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
+            <div class="flex items-center justify-between mb-2">
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">
+                        <% if (typeof user !== 'undefined' && user) { %>
+                            <% 
+                                const companyName = user.company && typeof user.company === 'object' ? user.company.name : 
+                                                   (typeof user.company === 'string' ? user.company : null);
+                            %>
+                            <% if (companyName) { %>
+                                <%= companyName %>
+                            <% } else if (user.username) { %>
+                                <%= user.username %>
+                            <% } else { %>
+                                <%= user.email %>
+                            <% } %>
+                        <% } %>
+                    </p>
+                    <p class="text-xs text-gray-500 truncate">
+                        <span id="tokenBalancesSidebar">Loading...</span>
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <a href="/user-management" 
+                   class="flex-1 text-center px-3 py-2 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200">
+                    Profile
+                </a>
+                <button onclick="logout()" 
+                        type="button"
+                        class="flex-1 px-3 py-2 text-xs font-medium text-white bg-red-500 rounded hover:bg-red-600">
+                    Logout
+                </button>
+            </div>
+        </div>
+    </aside>
+    
+    <!-- Main Content Area -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <!-- Top Bar -->
+        <header class="bg-white shadow-sm border-b border-gray-200">
+            <div class="px-6 py-4 flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">
+                        <% if (typeof pageTitle !== 'undefined' && pageTitle) { %>
+                            <%= pageTitle %>
+                        <% } else { %>
+                            Election Campaign
+                        <% } %>
+                    </h2>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <!-- Help Button -->
+                    <%- include('_helpButton') %>
+                </div>
+            </div>
+        </header>
+        
+        <!-- Page Content -->
+        <main class="flex-1 overflow-y-auto bg-gray-50" id="main-content">
+            <div class="p-6">
+                <!-- Content will be inserted here by views -->
+
+<script>
+// Load help ticket counts for admin users only
+async function loadHelpTicketCounts() {
+    try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        
+        try {
+            const userResponse = await fetch('/api/user', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (!userResponse.ok) return;
+            
+            const userData = await userResponse.json();
+            
+            if (!userData.userType || userData.userType !== 'app_owner') return;
+            if (!userData.permissions || (!userData.permissions.includes('manage_users') && !userData.permissions.includes('*'))) return;
+            
+        } catch (error) {
+            return;
+        }
+        
+        const response = await fetch('/api/admin/help-tickets/count', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+            const counts = await response.json();
+            const sidebarCount = document.getElementById('helpTicketsCountSidebar');
+            const sidebarNumber = document.getElementById('helpTicketsCountNumberSidebar');
+            if (sidebarCount && sidebarNumber && counts.open > 0) {
+                sidebarCount.classList.remove('hidden');
+                sidebarNumber.textContent = counts.open;
+            }
+        }
+    } catch (error) {
+        // Silent fail
+    }
+}
+
+// Update token balances in sidebar
+async function updateTokenBalances() {
+    try {
+        const response = await fetch('/api/user', {
+            credentials: 'include'
+        });
+        
+        if (response.ok) {
+            const userData = await response.json();
+            const smsTokens = typeof userData.smsTokens === 'object' ? (userData.smsTokens.balance || 0) : (userData.smsTokens || 0);
+            const emailTokens = typeof userData.emailTokens === 'object' ? (userData.emailTokens.balance || 0) : (userData.emailTokens || 0);
+            const aiTokens = userData.aiTokens || 0;
+            
+            const balanceEl = document.getElementById('tokenBalancesSidebar');
+            if (balanceEl) {
+                balanceEl.textContent = `SMS: ${smsTokens} | Email: ${emailTokens} | AI: ${aiTokens}`;
+            }
+        }
+    } catch (error) {
+        // Silent on network/connection errors so setInterval doesn't spam console
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadHelpTicketCounts();
+    updateTokenBalances();
+    setInterval(loadHelpTicketCounts, 30000);
+    setInterval(updateTokenBalances, 60000);
+});
+</script>
+            </div>
+        </main>
+    </div>
+</div>

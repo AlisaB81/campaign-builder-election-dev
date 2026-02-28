@@ -1,0 +1,1493 @@
+<%- include('partials/nav') %>
+
+<% 
+const isElectionAccount = (typeof user !== 'undefined' && user && (user.electionMode || user.accountType === 'election'));
+%>
+
+<style>
+/* Force View/Edit modals and contact list visible - do not rely on Tailwind */
+.election-view-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding-top: 2rem !important;
+  padding-bottom: 2rem !important;
+  overflow-y: auto !important;
+  background: rgba(0,0,0,0.5) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.election-view-modal-box {
+  position: relative !important;
+  z-index: 100000 !important;
+  width: 90% !important;
+  max-width: 72rem !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  padding: 1.25rem !important;
+  border-radius: 0.375rem !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.election-view-modal-table-wrap {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  max-height: 24rem !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  margin-top: 0.5rem !important;
+}
+.election-view-modal-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+}
+.election-view-modal-table th,
+.election-view-modal-table td {
+  padding: 0.75rem 1.5rem !important;
+  text-align: left !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  color: #111827 !important;
+  background: #ffffff !important;
+}
+.election-view-modal-table th {
+  background: #f9fafb !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+}
+.election-edit-modal-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  align-items: flex-start !important;
+  justify-content: center !important;
+  padding: 2rem !important;
+  overflow-y: auto !important;
+  background: rgba(0,0,0,0.5) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+.election-edit-modal-box {
+  position: relative !important;
+  z-index: 100000 !important;
+  background: #ffffff !important;
+  color: #111827 !important;
+  padding: 1.25rem !important;
+  border-radius: 0.375rem !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1) !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+</style>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <div class="py-6 space-y-8">
+    <!-- Page Header -->
+    <div class="bg-white shadow rounded-lg p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">Election Lists</h1>
+                <p class="mt-1 text-sm text-gray-500">Lists for canvassing, phone banks, and more. Search contacts below, select who to include, then create or update a list.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Your Lists -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+            <h2 class="text-lg font-semibold text-gray-900">Your lists</h2>
+            <span v-if="savedLists.length > 0" class="text-sm text-gray-500">{{ savedLists.length }} list(s)</span>
+        </div>
+        <div class="p-6">
+            <div id="savedLists" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div v-if="savedLists.length === 0" class="col-span-full text-center py-8 text-gray-500">
+                    No lists yet. Search contacts below and click &quot;Create list from selected&quot; to add your first list.
+                </div>
+                <div v-for="list in savedLists" :key="list.id" class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-2">
+                        <h3 class="font-semibold text-gray-900">{{ list.name || 'Unnamed List' }}</h3>
+                        <span class="text-sm font-medium text-gray-700">{{ list.contact_count || 0 }} contacts</span>
+                    </div>
+                    <p class="text-sm text-gray-600 mb-3 line-clamp-2">{{ list.description || 'No description' }}</p>
+                    <!-- Assign list to volunteer -->
+                    <div class="mb-3">
+                        <template v-if="volunteers.length > 0">
+                            <div class="flex flex-wrap items-center gap-2">
+                                <label :for="'assign-' + list.id" class="sr-only">Assign to volunteer</label>
+                                <select :id="'assign-' + list.id" v-model="assignSelection[list.id]" class="rounded-md border border-gray-300 px-2 py-1.5 text-sm focus:ring-indigo-500 focus:border-indigo-500 max-w-full sm:max-w-[180px]">
+                                    <option value="">Assign to volunteer...</option>
+                                    <option v-for="v in volunteers" :key="v.memberId" :value="v.memberId">{{ v.name || v.email }}</option>
+                                </select>
+                                <button type="button" @click="assignListToVolunteer(list.id)" :disabled="!assignSelection[list.id] || assignLoading[list.id]"
+                                        class="px-3 py-1.5 text-xs font-medium bg-violet-100 text-violet-700 rounded hover:bg-violet-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {{ assignLoading[list.id] ? 'Assigning...' : 'Assign' }}
+                                </button>
+                            </div>
+                        </template>
+                        <p v-else class="text-xs text-gray-500">
+                            Assign to volunteer: <a href="/teams" class="text-violet-600 hover:text-violet-800 font-medium">Add team members on Teams</a> to assign lists.
+                        </p>
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <a :href="'/election/navigation?listId=' + list.id" class="px-3 py-1.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded hover:bg-emerald-200">Use for navigation</a>
+                        <button type="button" @click="viewList(list.id)" class="px-3 py-1.5 text-xs font-medium bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">View</button>
+                        <button type="button" @click="editList(list)" class="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Edit</button>
+                        <button type="button" @click="exportList(list.id)" class="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded hover:bg-gray-200">Export</button>
+                        <button type="button" @click="deleteList(list.id)" class="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 rounded hover:bg-red-100">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- List contacts - ON PAGE with full CRUD (View/Edit) -->
+    <div v-if="viewingList" class="bg-white shadow rounded-lg overflow-visible" style="margin-top: 1.5rem; border: 1px solid #e5e7eb; border-radius: 0.5rem;">
+        <div style="padding: 1rem 1.5rem; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+                <h2 style="font-size: 1.125rem; font-weight: 600; color: #111827;">List: {{ viewingList.name }}</h2>
+                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">{{ viewingList.description || 'No description' }} — <strong>{{ viewingListContacts.length }}</strong> contact(s)</p>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+                <button type="button" @click="showAddContactsToList = !showAddContactsToList; addContactSearchResults = []; addContactsSelectedIds = [];" style="padding: 0.5rem 1rem; background: #d1fae5; color: #065f46; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">{{ showAddContactsToList ? 'Cancel add' : 'Add contacts' }}</button>
+                <button type="button" @click="closeViewListModal" style="padding: 0.5rem 1rem; background: #e5e7eb; color: #1f2937; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">Close</button>
+            </div>
+        </div>
+        <div style="padding: 1.5rem;">
+            <!-- Add contacts to this list -->
+            <div v-if="showAddContactsToList && viewingList" style="margin-bottom: 1.5rem; padding: 1rem; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 0.375rem;">
+                <h3 style="font-size: 0.9375rem; font-weight: 600; color: #111827; margin-bottom: 0.75rem;">Search contacts to add</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr)); gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <input type="text" v-model="addContactSearch.search" placeholder="Name, email, phone" style="padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                    <input type="text" v-model="addContactSearch.address" placeholder="Address" style="padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                    <select v-model="addContactSearch.city" style="padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                        <option value="">All cities</option>
+                        <option v-for="city in availableCities" :key="city" :value="city">{{ city }}</option>
+                    </select>
+                    <input type="text" v-model="addContactSearch.postalCode" placeholder="Postal code" style="padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                    <select v-model="addContactSearch.category" style="padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                        <option value="">All categories</option>
+                        <option v-for="cat in availableCategories" :key="cat" :value="cat">{{ cat }}</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button type="button" @click="applyAddContactsSearch" :disabled="loadingAddContactsSearch" style="padding: 0.5rem 1rem; background: #4f46e5; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">{{ loadingAddContactsSearch ? 'Searching...' : 'Search' }}</button>
+                    <button type="button" @click="showAddContactsToList = false; addContactSearchResults = []; addContactsSelectedIds = [];" style="padding: 0.5rem 1rem; background: #e5e7eb; color: #374151; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">Cancel</button>
+                </div>
+                <div v-if="addContactSearchResults.length > 0" style="max-height: 12rem; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 0.375rem; background: #fff; margin-bottom: 0.5rem;">
+                    <table class="election-view-modal-table" style="font-size: 0.8125rem;">
+                        <thead><tr><th style="width: 2rem;"></th><th>Name</th><th>Email</th><th>City</th></tr></thead>
+                        <tbody>
+                            <tr v-for="c in addContactSearchResults" :key="c.id">
+                                <td><input type="checkbox" :value="c.id" v-model="addContactsSelectedIds"></td>
+                                <td>{{ c.name || (c.firstName + ' ' + c.lastName) || '-' }}</td>
+                                <td>{{ c.email || '-' }}</td>
+                                <td>{{ c.city || '-' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <button v-if="addContactSearchResults.length > 0" type="button" @click="addSelectedContactsToList" :disabled="addContactsSelectedIds.length === 0 || addingContactsToList" style="padding: 0.5rem 1rem; background: #059669; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">{{ addingContactsToList ? 'Adding...' : 'Add ' + addContactsSelectedIds.length + ' to list' }}</button>
+            </div>
+            <!-- Edit contact inline (above table) - updates contact manager -->
+            <div id="edit-contact-inline-panel" v-if="editingContact" style="margin-bottom: 1.5rem; padding: 1.25rem; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h3 style="font-size: 1rem; font-weight: 600; color: #3730a3;">Edit contact — {{ [editingContact.firstName, editingContact.lastName].filter(Boolean).join(' ') || editingContact.name || 'Unnamed' }}</h3>
+                    <button type="button" @click="closeEditContactModal" style="background: none; border: none; font-size: 1.25rem; color: #6b7280; cursor: pointer; padding: 0 0.25rem;">&times;</button>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); gap: 0.75rem;">
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">First name</label><input type="text" v-model="editingContact.firstName" placeholder="First name" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Last name</label><input type="text" v-model="editingContact.lastName" placeholder="Last name" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Email</label><input type="email" v-model="editingContact.email" placeholder="Email" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Phone</label><input type="text" v-model="editingContact.phone" placeholder="Phone" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Address</label><input type="text" v-model="editingContact.address" placeholder="Address" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">City</label><input type="text" v-model="editingContact.city" placeholder="City" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Postal code</label><input type="text" v-model="editingContact.postalCode" placeholder="Postal code" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Category</label><select v-model="editingContact.category" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem; background: #fff;"><option value="">No category</option><option v-for="cat in editCategoryOptions" :key="cat" :value="cat">{{ cat }}</option></select></div>
+                    <div><label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Poll #</label><input type="text" v-model="editingContact.pollNumber" placeholder="Poll number" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></div>
+                </div>
+                <div style="margin-top: 0.75rem;">
+                    <label style="display: block; font-size: 0.75rem; font-weight: 500; color: #4b5563; margin-bottom: 0.2rem;">Notes (volunteer notes)</label>
+                    <textarea v-model="editingContact.notes" placeholder="Add or edit notes..." rows="2" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #a5b4fc; border-radius: 0.375rem;"></textarea>
+                </div>
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button type="button" @click="saveContactEdit" :disabled="savingContact" style="padding: 0.5rem 1rem; background: #4f46e5; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">{{ savingContact ? 'Saving...' : 'Save to contact manager' }}</button>
+                    <button type="button" @click="closeEditContactModal" style="padding: 0.5rem 1rem; background: #e5e7eb; color: #374151; border: none; border-radius: 0.375rem; cursor: pointer; font-size: 0.875rem;">Cancel</button>
+                </div>
+            </div>
+            <div v-if="loadingViewContacts" style="padding: 2rem; text-align: center; color: #6b7280;">Loading contacts...</div>
+            <div v-else-if="viewingListContacts.length === 0" style="padding: 2rem; text-align: center; color: #6b7280;">No contacts in this list. Use &quot;Add contacts&quot; above to add some.</div>
+            <div v-else class="election-view-modal-table-wrap">
+                <table class="election-view-modal-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>Address</th>
+                            <th>City</th>
+                            <th>Postal code</th>
+                            <th>Category</th>
+                            <th>Poll #</th>
+                            <th>Notes</th>
+                            <th style="width: 8rem;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="contact in viewingListContacts" :key="contact.id">
+                            <td>{{ contact.name || (contact.firstName + ' ' + contact.lastName) || 'Unknown' }}</td>
+                            <td>{{ contact.email || '-' }}</td>
+                            <td>{{ contact.phone || '-' }}</td>
+                            <td>{{ contact.address || '-' }}</td>
+                            <td>{{ contact.city || '-' }}</td>
+                            <td>{{ contact.postalCode || contact.postal_code || '-' }}</td>
+                            <td>{{ (contact.categories && contact.categories.join(', ')) || contact.category || '-' }}</td>
+                            <td>{{ contact.pollNumber || '-' }}</td>
+                            <td style="white-space: nowrap;">
+                                <span v-if="getNotesArray(contact).length"
+                                      style="cursor: pointer; font-size: 0.75rem; color: #4b5563;"
+                                      @click="openListNotesModal(contact)"
+                                      role="button"
+                                      tabindex="0"
+                                      @keydown.enter.prevent="openListNotesModal(contact)"
+                                      @keydown.space.prevent="openListNotesModal(contact)"
+                                      :title="'Click to view notes or add another'">{{ getNotesArray(contact).length }} note(s) · {{ formatNotesTimestamp(contact) }} …</span>
+                                <span v-else
+                                      style="cursor: pointer; font-size: 0.75rem; color: #4f46e5; font-weight: 500;"
+                                      @click="openListNotesModal(contact)"
+                                      role="button"
+                                      tabindex="0"
+                                      @keydown.enter.prevent="openListNotesModal(contact)"
+                                      @keydown.space.prevent="openListNotesModal(contact)"
+                                      title="Add note">Add note</span>
+                            </td>
+                            <td style="white-space: nowrap;">
+                                <button type="button" @click.stop.prevent="openEditContact(contact)" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; background: #e0e7ff; color: #3730a3; border: none; border-radius: 0.25rem; cursor: pointer; margin-right: 0.5rem;">Edit</button>
+                                <button v-if="isViewingListStatic" type="button" @click.stop="removeContactFromList(contact.id)" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; background: #fee2e2; color: #991b1b; border: none; border-radius: 0.25rem; cursor: pointer;">Remove from list</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Notes popup (full note + timestamp) -->
+            <div v-if="showListNotesModal && listNotesModalContact"
+                 style="position: fixed; inset: 0; z-index: 50; overflow-y: auto; background: rgba(0,0,0,0.5);"
+                 role="dialog"
+                 aria-labelledby="list-notes-modal-title"
+                 @click.self="closeListNotesModal"
+                 @keydown.esc="closeListNotesModal">
+                <div style="display: flex; min-height: 100%; align-items: center; justify-content: center; padding: 1rem;">
+                    <div style="position: relative; background: #fff; border-radius: 0.5rem; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); max-width: 32rem; width: 100%; max-height: 80vh; display: flex; flex-direction: column;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid #e5e7eb;">
+                            <h3 id="list-notes-modal-title" style="font-size: 1.125rem; font-weight: 600; color: #111827;">Note</h3>
+                            <button type="button" @click="closeListNotesModal" style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;">&times;</button>
+                        </div>
+                        <div style="padding: 0.5rem 1.25rem; font-size: 0.875rem; color: #6b7280; border-bottom: 1px solid #f3f4f6;">
+                            {{ (listNotesModalContact.firstName || '') + ' ' + (listNotesModalContact.lastName || '') || listNotesModalContact.name || '—' }}
+                            <span v-if="getNotesArray(listNotesModalContact).length" style="color: #9ca3af; margin-left: 0.5rem;">{{ getNotesArray(listNotesModalContact).length }} note(s)</span>
+                        </div>
+                        <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: 0.75rem;">
+                            <div v-for="(note, i) in getNotesArray(listNotesModalContact).slice().reverse()" :key="i" style="font-size: 0.875rem; border-bottom: 1px solid #f3f4f6; padding-bottom: 0.5rem;">
+                                <div style="color: #6b7280; font-size: 0.75rem; margin-bottom: 0.25rem;">{{ formatNoteTimestamp(note) }}{{ note.authorName ? ' · ' + note.authorName : '' }}</div>
+                                <div style="color: #374151; white-space: pre-wrap;">{{ note.text || '—' }}</div>
+                            </div>
+                            <div v-if="getNotesArray(listNotesModalContact).length === 0" style="color: #9ca3af; font-size: 0.875rem;">No notes yet. Add one below.</div>
+                            <div style="margin-top: 0.5rem;">
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Your full name *</label>
+                                <input type="text" v-model="listNotesModalAuthorName" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;" placeholder="First and last name">
+                            </div>
+                            <div style="margin-top: 0.5rem;">
+                                <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Add a note</label>
+                                <textarea v-model="listNotesModalNewText" rows="3" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; font-size: 0.875rem;" placeholder="Type a new note..."></textarea>
+                            </div>
+                        </div>
+                        <div style="padding: 0.75rem 1.25rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 0.5rem;">
+                            <button type="button" @click="closeListNotesModal" style="padding: 0.5rem 1rem; background: #e5e7eb; color: #374151; border: none; border-radius: 0.375rem; cursor: pointer;">Close</button>
+                            <button type="button" @click="saveListNotesFromModal" :disabled="savingListNotes || !listNotesModalNewText.trim() || !(listNotesModalAuthorName || '').trim()" style="padding: 0.5rem 1rem; background: #4f46e5; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer;">{{ savingListNotes ? 'Saving...' : 'Add note' }}</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search contacts → select → create list -->
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-semibold text-gray-900">Search contacts & create list</h2>
+            <p class="mt-1 text-sm text-gray-500">Filter by name, address, city, postal code, or category. Click Search, then select contacts and create a new list.</p>
+        </div>
+        <div class="p-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Name, email, or phone</label>
+                <input type="text" v-model="filterConfig.search" placeholder="Search by name, email, phone" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Address</label>
+                <input type="text" v-model="filterConfig.address" placeholder="Partial address" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">City</label>
+                <select v-model="filterConfig.city" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">All Cities</option>
+                    <option v-for="city in availableCities" :key="city" :value="city">{{ city }}</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Province</label>
+                <select v-model="filterConfig.province" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">All Provinces</option>
+                    <option v-for="prov in availableProvinces" :key="prov" :value="prov">{{ prov }}</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Postal code</label>
+                <input type="text" v-model="filterConfig.postalCode" placeholder="Full or partial" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select v-model="filterConfig.category" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="">All Categories</option>
+                    <option v-for="cat in availableCategories" :key="cat" :value="cat">{{ cat }}</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Poll number</label>
+                <input type="text" v-model="filterConfig.pollNumber" placeholder="Poll number" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">Last contact date</label>
+                <input type="date" v-model="filterConfig.lastContactDate" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+        <div class="mt-4 flex flex-wrap items-center gap-3">
+            <button @click="applyFilters" 
+                    :disabled="loading"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium disabled:opacity-50">
+                {{ loading ? 'Searching...' : 'Search' }}
+            </button>
+            <button @click="clearFilters" 
+                    :disabled="loading"
+                    class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 text-sm hover:bg-gray-50 disabled:opacity-50">
+                Clear
+            </button>
+            <span v-if="filteredContacts.length > 0" class="text-sm text-gray-600">
+                <strong>{{ filteredContacts.length }}</strong> contact(s) match. Select below, then create list.
+            </span>
+        </div>
+        </div>
+
+        <!-- Results table (same card) -->
+        <div v-if="filteredContacts.length > 0" class="border-t border-gray-200">
+        <div class="px-6 py-4 flex items-center justify-between bg-gray-50">
+            <span class="text-sm font-medium text-gray-700">Select contacts to add to a new list</span>
+            <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 text-sm text-gray-700">
+                    <input type="checkbox" 
+                           v-model="selectAllFiltered"
+                           @change="toggleSelectAllFiltered"
+                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    Select all
+                </label>
+                <button @click.stop="showCreateListModal = true" 
+                        type="button"
+                        :disabled="selectedContactIds.length === 0"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                    Create list from selected ({{ selectedContactIds.length }})
+                </button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                            <input type="checkbox" 
+                                   v-model="selectAllFiltered"
+                                   @change="toggleSelectAllFiltered"
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Address</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">City</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Postal code</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Poll #</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    <tr v-if="filteredContacts.length === 0 && !loading">
+                        <td colspan="9" class="px-6 py-8 text-center text-gray-500">
+                            <p v-if="matchCount === 0">No contacts match the current filters. Try adjusting your filter criteria.</p>
+                            <p v-else>No contacts to display. Click "Apply Filters" to load contacts.</p>
+                        </td>
+                    </tr>
+                    <tr v-for="contact in filteredContacts" :key="contact.id" class="hover:bg-gray-50">
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <input type="checkbox" 
+                                   :value="contact.id"
+                                   v-model="selectedContactIds"
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ contact.name || (contact.firstName + ' ' + contact.lastName) || 'Unknown' }}
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ contact.email || '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ contact.phone || '-' }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" :title="contact.address">{{ contact.address || '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ contact.city || '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ contact.postalCode || contact.postal_code || '-' }}</td>
+                        <td class="px-6 py-4 whitespace-nowrap">
+                            <span v-for="cat in getDisplayCategories(contact)" :key="cat" 
+                                  class="inline-block px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded mr-1">
+                                {{ cat }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ contact.pollNumber || '-' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        </div>
+    </div>
+
+    <Teleport to="body">
+    <!-- Create List Modal -->
+    <div v-if="showCreateListModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[9999]" @click.self="closeCreateListModal" @keydown.esc="closeCreateListModal">
+    <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Create List</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">List Name *</label>
+                    <input type="text" v-model="newListName" required
+                           placeholder="Enter list name"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                    <textarea v-model="newListDescription" rows="3"
+                              placeholder="Enter list description"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-md">
+                    <p class="text-sm text-gray-600">
+                        <span v-if="selectedContactIds.length > 0">
+                            This list will contain <strong>{{ selectedContactIds.length }}</strong> selected contact(s).
+                        </span>
+                        <span v-else>
+                            This list will use the current filter configuration and will update dynamically.
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button @click.stop="closeCreateListModal" 
+                        type="button"
+                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                    Cancel
+                </button>
+                <button @click.stop="saveList" 
+                        type="button"
+                        :disabled="!newListName || submitting"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">
+                    {{ submitting ? 'Creating...' : 'Create List' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit List Modal -->
+    <div v-show="showEditListModal" class="election-edit-modal-overlay" @click.self="closeEditListModal" @keydown.esc="closeEditListModal">
+    <div class="election-edit-modal-box" style="width: 24rem;">
+        <div class="mt-3">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Edit List</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">List Name *</label>
+                    <input type="text" v-model="newListName" required
+                           placeholder="Enter list name"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                    <textarea v-model="newListDescription" rows="3"
+                              placeholder="Enter list description"
+                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+                </div>
+                <div class="bg-gray-50 p-3 rounded-md">
+                    <p class="text-sm text-gray-600">
+                        <span v-if="editingList">
+                            This list contains <strong>{{ editingList.contact_count || 0 }}</strong> contact(s).
+                        </span>
+                    </p>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button @click.stop="closeEditListModal" 
+                        type="button"
+                        class="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300">
+                    Cancel
+                </button>
+                <button @click.stop="saveList" 
+                        type="button"
+                        :disabled="!newListName || submitting"
+                        class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50">
+                    {{ submitting ? 'Saving...' : 'Save Changes' }}
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Contact Modal (updates contact manager) -->
+    <div v-if="showEditContactModal && editingContact" class="election-edit-modal-overlay" style="z-index: 100001 !important;" @click.self="closeEditContactModal" @keydown.esc="closeEditContactModal">
+        <div class="election-edit-modal-box" style="max-width: 32rem; max-height: 90vh; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #111827;">Edit contact</h3>
+                <button type="button" @click="closeEditContactModal" style="background: none; border: none; font-size: 1.5rem; color: #6b7280; cursor: pointer;">&times;</button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">First name</label>
+                    <input type="text" v-model="editingContact.firstName" placeholder="First name" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Last name</label>
+                    <input type="text" v-model="editingContact.lastName" placeholder="Last name" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Email</label>
+                    <input type="email" v-model="editingContact.email" placeholder="Email" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Phone</label>
+                    <input type="text" v-model="editingContact.phone" placeholder="Phone" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Address</label>
+                    <input type="text" v-model="editingContact.address" placeholder="Address" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">City</label>
+                    <input type="text" v-model="editingContact.city" placeholder="City" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Postal code</label>
+                    <input type="text" v-model="editingContact.postalCode" placeholder="Postal code" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Category</label>
+                    <select v-model="editingContact.category" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem; background: #fff;">
+                        <option value="">No category</option>
+                        <option v-for="cat in editCategoryOptions" :key="cat" :value="cat">{{ cat }}</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Poll #</label>
+                    <input type="text" v-model="editingContact.pollNumber" placeholder="Poll number" style="width: 100%; padding: 0.5rem 0.75rem; border: 1px solid #d1d5db; border-radius: 0.375rem;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 0.875rem; font-weight: 500; color: #374151; margin-bottom: 0.25rem;">Notes (volunteer notes)</label>
+                    <p style="font-size: 0.875rem; color: #6b7280; margin-bottom: 0.25rem;">{{ getNotesArray(editingContact).length }} note(s). View or add notes with timestamps in the table.</p>
+                    <button type="button" @click="openListNotesModal(editingContact)" style="font-size: 0.875rem; color: #4f46e5; font-weight: 500; background: none; border: none; cursor: pointer; padding: 0;">View / add notes</button>
+                </div>
+            </div>
+            <div style="margin-top: 1.25rem; display: flex; gap: 0.5rem; justify-content: flex-end;">
+                <button type="button" @click="closeEditContactModal" style="padding: 0.5rem 1rem; background: #e5e7eb; color: #374151; border: none; border-radius: 0.375rem; cursor: pointer;">Cancel</button>
+                <button type="button" @click="saveContactEdit" :disabled="savingContact" style="padding: 0.5rem 1rem; background: #4f46e5; color: #fff; border: none; border-radius: 0.375rem; cursor: pointer;">{{ savingContact ? 'Saving...' : 'Save' }}</button>
+            </div>
+        </div>
+    </div>
+    </Teleport>
+
+    <!-- View List Modal - CSS classes force visibility (not Tailwind-dependent) -->
+    <div v-if="showViewListModal" :key="viewModalKey" class="election-view-modal-overlay" @click.self="closeViewListModal" @keydown.esc="closeViewListModal">
+        <div class="election-view-modal-box">
+            <div style="margin-top: 0.75rem;">
+                <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between;">
+                    <h3 id="view-list-title" style="font-size: 1.125rem; font-weight: 500; color: #111827;">
+                        {{ viewingList ? viewingList.name : 'List Details' }}
+                    </h3>
+                    <button @click.stop="closeViewListModal" 
+                            type="button"
+                            style="color: #6b7280; font-size: 1.5rem; line-height: 1; cursor: pointer; background: none; border: none;">
+                        &times;
+                    </button>
+                </div>
+                
+                <div v-if="viewingList" style="margin-bottom: 1rem;">
+                    <p style="font-size: 0.875rem; color: #4b5563;">{{ viewingList.description || 'No description' }}</p>
+                    <p style="margin-top: 0.5rem; font-size: 0.875rem; color: #6b7280;">
+                        <strong>{{ viewingListContacts.length }}</strong> contact(s)
+                    </p>
+                    <button type="button" @click="showAddContactsToList = true"
+                            class="mt-2 rounded px-3 py-1.5 text-sm bg-indigo-100 text-indigo-700 hover:bg-indigo-200">
+                        Add contacts to this list
+                    </button>
+                </div>
+
+                <div v-if="showAddContactsToList && viewingList" class="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <h4 class="mb-3 text-sm font-medium text-gray-900">Search contacts to add (name, address, city, postal code, category)</h4>
+                    <div class="mb-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <input type="text" v-model="addContactSearch.search" placeholder="Name, email, phone"
+                               class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                        <input type="text" v-model="addContactSearch.address" placeholder="Address"
+                               class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                        <select v-model="addContactSearch.city" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                            <option value="">All cities</option>
+                            <option v-for="city in availableCities" :key="city" :value="city">{{ city }}</option>
+                        </select>
+                        <input type="text" v-model="addContactSearch.postalCode" placeholder="Postal code"
+                               class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                        <select v-model="addContactSearch.category" class="rounded-md border border-gray-300 px-3 py-2 text-sm">
+                            <option value="">All categories</option>
+                            <option v-for="cat in availableCategories" :key="cat" :value="cat">{{ cat }}</option>
+                        </select>
+                        <div class="flex items-center gap-2 md:col-span-2">
+                            <button type="button" @click="applyAddContactsSearch" :disabled="loadingAddContactsSearch"
+                                    class="rounded-md bg-indigo-600 px-3 py-2 text-sm text-white hover:bg-indigo-700 disabled:opacity-50">
+                                {{ loadingAddContactsSearch ? 'Searching...' : 'Search' }}
+                            </button>
+                            <button type="button" @click="showAddContactsToList = false; addContactSearchResults = []"
+                                    class="rounded-md border border-gray-300 px-3 py-2 text-sm hover:bg-gray-50">
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="addContactSearchResults.length > 0" class="mt-3 max-h-48 overflow-y-auto rounded border border-gray-200 bg-white p-2">
+                        <table class="min-w-full text-sm">
+                            <thead><tr><th class="w-8 text-left"></th><th class="text-left">Name</th><th class="text-left">Email</th><th class="text-left">City</th></tr></thead>
+                            <tbody>
+                                <tr v-for="c in addContactSearchResults" :key="c.id" class="border-t border-gray-100">
+                                    <td>
+                                        <input type="checkbox" :value="c.id" v-model="addContactsSelectedIds" class="rounded border-gray-300 text-indigo-600">
+                                    </td>
+                                    <td>{{ c.name || (c.firstName + ' ' + c.lastName) || '-' }}</td>
+                                    <td>{{ c.email || '-' }}</td>
+                                    <td>{{ c.city || '-' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div v-if="addContactSearchResults.length > 0" class="mt-2 flex gap-2">
+                        <button type="button" @click="addSelectedContactsToList" :disabled="addContactsSelectedIds.length === 0 || addingContactsToList"
+                                class="rounded-md bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700 disabled:opacity-50">
+                            {{ addingContactsToList ? 'Adding...' : 'Add ' + addContactsSelectedIds.length + ' to list' }}
+                        </button>
+                    </div>
+                </div>
+                
+                <div style="min-height: 200px;">
+                    <div v-show="loadingViewContacts" style="padding: 2rem 0; text-align: center;">
+                        <p style="color: #6b7280;">Loading contacts...</p>
+                    </div>
+                    <div v-show="!loadingViewContacts && viewingListContacts.length === 0" style="padding: 2rem 0; text-align: center;">
+                        <p style="color: #6b7280;">No contacts in this list.</p>
+                    </div>
+                    <div v-show="showViewContactsTable" class="election-view-modal-table-wrap">
+                        <table class="election-view-modal-table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Phone</th>
+                                    <th>Address</th>
+                                    <th>City</th>
+                                    <th>Postal code</th>
+                                    <th>Category</th>
+                                    <th>Poll #</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="contact in viewingListContacts" :key="contact.id">
+                                    <td>{{ contact.name || (contact.firstName + ' ' + contact.lastName) || 'Unknown' }}</td>
+                                    <td>{{ contact.email || '-' }}</td>
+                                    <td>{{ contact.phone || '-' }}</td>
+                                    <td>{{ contact.address || '-' }}</td>
+                                    <td>{{ contact.city || '-' }}</td>
+                                    <td>{{ contact.postalCode || contact.postal_code || '-' }}</td>
+                                    <td>{{ (contact.categories && contact.categories.join(', ')) || contact.category || '-' }}</td>
+                                    <td>{{ contact.pollNumber || '-' }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 1.5rem; display: flex; justify-content: flex-end;">
+                    <button @click.stop="closeViewListModal" 
+                            type="button"
+                            style="padding: 0.5rem 1rem; background: #e5e7eb; color: #1f2937; border: none; border-radius: 0.375rem; cursor: pointer;">
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+
+createApp({
+    data() {
+        return {
+            savedLists: [],
+            matchCount: 0,
+            filteredContacts: [],
+            selectedContactIds: [],
+            selectAllFiltered: false,
+            filterConfig: {
+                search: '',
+                address: '',
+                category: '',
+                pollNumber: '',
+                city: '',
+                province: '',
+                postalCode: '',
+                lastContactDate: ''
+            },
+            availableCategories: [],
+            availableCities: [],
+            availableProvinces: [],
+            loading: false,
+            showCreateListModal: false,
+            showEditListModal: false,
+            showViewListModal: false,
+            viewingList: null,
+            viewingListContacts: [],
+            viewModalKey: 0,
+            loadingViewContacts: false,
+            showAddContactsToList: false,
+            addContactSearch: { search: '', address: '', city: '', postalCode: '', category: '' },
+            addContactSearchResults: [],
+            addContactsSelectedIds: [],
+            loadingAddContactsSearch: false,
+            addingContactsToList: false,
+            editingList: null,
+            newListName: '',
+            newListDescription: '',
+            submitting: false,
+            editingContact: null,
+            showEditContactModal: false,
+            savingContact: false,
+            showListNotesModal: false,
+            listNotesModalContact: null,
+            listNotesModalNewText: '',
+            savingListNotes: false,
+            volunteers: [],
+            assignSelection: {},
+            assignLoading: {}
+        }
+    },
+    async mounted() {
+        this.showCreateListModal = false;
+        this.showEditListModal = false;
+        this.showViewListModal = false;
+        this.newListName = '';
+        this.newListDescription = '';
+        this.editingList = null;
+        await this.loadSavedLists();
+        await this.loadCategoriesAndCities();
+        await this.loadVolunteers();
+    },
+    methods: {
+        async loadSavedLists() {
+            try {
+                const response = await fetch('/api/election/lists', {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.savedLists = data.lists || [];
+                } else {
+                    console.error('Failed to load lists:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('Failed to load lists:', error);
+            }
+        },
+        async loadCategoriesAndCities() {
+            try {
+                // Use dedicated endpoint for filter options
+                const response = await fetch('/api/election/lists/filter-options', {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.availableCategories = data.categories || [];
+                    this.availableCities = data.cities || [];
+                } else {
+                    console.error('Failed to load filter options:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('Failed to load categories and cities:', error);
+            }
+        },
+        async loadVolunteers() {
+            try {
+                const response = await fetch('/election/teams/data', { credentials: 'include' });
+                if (response.ok) {
+                    const data = await response.json();
+                    this.volunteers = data.members || [];
+                }
+            } catch (error) {
+                console.error('Failed to load volunteers:', error);
+            }
+        },
+        async assignListToVolunteer(listId, memberId) {
+            const mid = memberId || (this.assignSelection && this.assignSelection[listId]);
+            if (!mid) return;
+            this.assignLoading[listId] = true;
+            try {
+                const response = await fetch('/election/assignments/create', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ memberId: mid, listId })
+                });
+                if (response.ok) {
+                    this.assignSelection[listId] = '';
+                } else {
+                    const data = await response.json().catch(() => ({}));
+                    alert(data.error || 'Failed to assign list.');
+                }
+            } catch (error) {
+                console.error('Assign list error:', error);
+                alert('Failed to assign list.');
+            } finally {
+                this.assignLoading[listId] = false;
+            }
+        },
+        async applyFilters() {
+            try {
+                this.loading = true;
+                this.selectedContactIds = [];
+                this.selectAllFiltered = false;
+                
+                const response = await fetch('/api/election/lists/contacts', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        filterConfig: this.filterConfig,
+                        limit: 10000, // Large limit to get all matching contacts
+                        offset: 0
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.filteredContacts = data.contacts || [];
+                    this.matchCount = data.total || 0;
+                } else {
+                    console.error('Failed to apply filters:', response.status);
+                    alert('Failed to apply filters. Please try again.');
+                }
+            } catch (error) {
+                console.error('Failed to apply filters:', error);
+                alert('Failed to apply filters. Please try again.');
+            } finally {
+                this.loading = false;
+            }
+        },
+        clearFilters() {
+            this.filterConfig = {
+                search: '',
+                address: '',
+                category: '',
+                pollNumber: '',
+                city: '',
+                province: '',
+                postalCode: '',
+                lastContactDate: ''
+            };
+            this.filteredContacts = [];
+            this.selectedContactIds = [];
+            this.selectAllFiltered = false;
+            this.matchCount = 0;
+        },
+        closeCreateListModal() {
+            this.showCreateListModal = false;
+            this.newListName = '';
+            this.newListDescription = '';
+            // Don't clear selectedContactIds here - user might want to create another list with same selection
+        },
+        closeEditListModal() {
+            this.showEditListModal = false;
+            this.editingList = null;
+            this.newListName = '';
+            this.newListDescription = '';
+        },
+        editList(list) {
+            console.log('[Election Lists] editList called', list?.id, list?.name);
+            this.showViewListModal = false;
+            this.editingList = list;
+            this.newListName = list.name || '';
+            this.newListDescription = list.description || '';
+            this.showEditListModal = true;
+            if (!this.viewingList || this.viewingList.id !== list.id) {
+                this.viewList(list.id);
+            }
+        },
+        async deleteList(listId) {
+            if (!confirm('Are you sure you want to delete this list? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/election/lists/${listId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    await this.loadSavedLists();
+                    alert('List deleted successfully!');
+                } else {
+                    const error = await response.json();
+                    alert('Failed to delete list: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to delete list:', error);
+                alert('Failed to delete list. Please try again.');
+            }
+        },
+        toggleSelectAllFiltered() {
+            if (this.selectAllFiltered) {
+                this.selectedContactIds = this.filteredContacts.map(c => c.id);
+            } else {
+                this.selectedContactIds = [];
+            }
+        },
+        getDisplayCategories(contact) {
+            if (Array.isArray(contact.categories)) {
+                return contact.categories.filter(c => c);
+            } else if (contact.category) {
+                return [contact.category];
+            }
+            return [];
+        },
+        async saveList() {
+            if (!this.newListName || !this.newListName.trim()) {
+                alert('Please enter a list name.');
+                return;
+            }
+
+            try {
+                this.submitting = true;
+                
+                // If contacts are selected, create a static list with those contact IDs
+                // Otherwise, create a dynamic list based on filters
+                let filterConfig = this.filterConfig;
+                let contactIds = null;
+                
+                if (this.selectedContactIds.length > 0) {
+                    // Static list with selected contacts
+                    contactIds = this.selectedContactIds;
+                    // Store filter config for reference but list will be static
+                    filterConfig = {
+                        ...this.filterConfig,
+                        _staticContactIds: contactIds
+                    };
+                }
+                
+                let url = '/api/election/lists';
+                let method = 'POST';
+                let body = {
+                    name: this.newListName.trim(),
+                    description: this.newListDescription.trim() || null,
+                    filterConfig: filterConfig,
+                    contactIds: contactIds, // Include selected contact IDs if any
+                    isShared: false
+                };
+                
+                // If editing, update the existing list (preserve its filter_config and contact IDs)
+                if (this.editingList && this.showEditListModal) {
+                    url = `/api/election/lists/${this.editingList.id}`;
+                    method = 'PUT';
+                    body.id = this.editingList.id;
+                    const existingCfg = this.editingList.filter_config || this.editingList.filterConfig || {};
+                    body.filterConfig = existingCfg;
+                    body.contactIds = existingCfg._staticContactIds || undefined;
+                } else {
+                    body.id = `list_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                }
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(body)
+                });
+
+                if (response.ok) {
+                    await this.loadSavedLists();
+                    if (this.showEditListModal) {
+                        if (this.viewingList && this.viewingList.id === this.editingList.id) {
+                            this.viewingList = { ...this.viewingList, name: this.newListName.trim(), description: (this.newListDescription || '').trim() };
+                        }
+                        this.closeEditListModal();
+                        alert('List updated successfully!');
+                    } else {
+                        this.closeCreateListModal();
+                        this.selectedContactIds = [];
+                        this.selectAllFiltered = false;
+                        alert('List created successfully!');
+                    }
+                } else {
+                    const error = await response.json();
+                    alert('Failed to save list: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to save list:', error);
+                alert('Failed to save list. Please try again.');
+            } finally {
+                this.submitting = false;
+            }
+        },
+        async viewList(listId) {
+            console.log('[Election Lists] viewList called', listId);
+            this.showEditListModal = false;
+            this.showViewListModal = false;
+            this.loadingViewContacts = true;
+            this.viewingListContacts = [];
+            this.viewingList = { id: listId, name: 'Loading...', description: '' };
+            const timeoutMs = 15000;
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Request timed out')), timeoutMs));
+            try {
+                const listResponse = await Promise.race([
+                    fetch(`/api/election/lists/${listId}`, { credentials: 'include' }),
+                    timeoutPromise
+                ]);
+                if (!listResponse.ok) {
+                    this.loadingViewContacts = false;
+                    alert('Failed to load list details.');
+                    this.closeViewListModal();
+                    return;
+                }
+                const listData = await listResponse.json();
+                const list = listData.list;
+                if (!list) {
+                    this.loadingViewContacts = false;
+                    alert('Invalid list response.');
+                    this.closeViewListModal();
+                    return;
+                }
+                this.viewingList = list;
+                let filterConfig = list.filter_config || list.filterConfig || {};
+                const staticIds = filterConfig._staticContactIds;
+                const isStatic = (filterConfig._isStatic || staticIds) && Array.isArray(staticIds) && staticIds.length > 0;
+                const body = isStatic
+                    ? { filterConfig: { _staticContactIds: filterConfig._staticContactIds }, limit: 10000, offset: 0 }
+                    : { filterConfig: filterConfig, limit: 10000, offset: 0 };
+                const contactsResponse = await Promise.race([
+                    fetch('/api/election/lists/contacts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(body)
+                    }),
+                    timeoutPromise
+                ]);
+                const contactsData = await contactsResponse.json().catch(() => ({}));
+                const rawContacts = contactsData.contacts ?? contactsData.data?.contacts;
+                const contactList = Array.isArray(rawContacts) ? rawContacts : [];
+                this.loadingViewContacts = false;
+                this.viewingListContacts = contactList.slice();
+                this.viewListContactsKey = Date.now();
+                this.viewModalKey = Date.now();
+                console.log('[Election Lists] View list: status=', contactsResponse.status, 'contacts in response=', contactList.length, 'keys=', Object.keys(contactsData || {}));
+                if (!contactsResponse.ok) {
+                    console.warn('[Election Lists] Contacts response not ok:', contactsResponse.status, contactsData);
+                }
+            } catch (error) {
+                console.error('Failed to view list:', error);
+                if (error && error.message === 'Request timed out') {
+                    alert('Request timed out. The server may be slow or the list may be very large.');
+                } else {
+                    alert('Failed to load list. Please try again.');
+                }
+                this.closeViewListModal();
+            } finally {
+                this.loadingViewContacts = false;
+            }
+        },
+        closeViewListModal() {
+            this.showViewListModal = false;
+            this.showEditListModal = false;
+            this.viewingList = null;
+            this.viewingListContacts = [];
+            this.showAddContactsToList = false;
+            this.addContactSearchResults = [];
+            this.addContactsSelectedIds = [];
+        },
+        async deleteListFromPanel() {
+            if (!this.viewingList || !confirm('Delete this list? This cannot be undone.')) return;
+            try {
+                const res = await fetch(`/api/election/lists/${this.viewingList.id}`, { method: 'DELETE', credentials: 'include' });
+                if (res.ok) {
+                    this.closeViewListModal();
+                    await this.loadSavedLists();
+                    alert('List deleted.');
+                } else {
+                    const err = await res.json();
+                    alert('Failed to delete: ' + (err.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to delete list.');
+            }
+        },
+        openEditContact(contact) {
+            if (!contact || contact.id == null) return;
+            const c = contact;
+            this.editingContact = {
+                id: c.id,
+                name: c.name,
+                firstName: c.firstName,
+                lastName: c.lastName,
+                email: c.email,
+                phone: c.phone,
+                address: c.address,
+                city: c.city,
+                postalCode: c.postalCode || c.postal_code,
+                postal_code: c.postal_code || c.postalCode,
+                category: Array.isArray(c.categories) ? c.categories.join(', ') : (c.category || ''),
+                categories: c.categories,
+                pollNumber: c.pollNumber,
+                notes: c.notes
+            };
+            this.showEditContactModal = true;
+            this.$nextTick(() => {
+                const el = document.getElementById('edit-contact-inline-panel');
+                if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            });
+        },
+        closeEditContactModal() {
+            this.showEditContactModal = false;
+            this.editingContact = null;
+        },
+        getNotesArray(contact) {
+            if (!contact) return [];
+            if (Array.isArray(contact.notes)) return contact.notes.filter(n => n && (n.text != null || n.updatedAt));
+            const text = (contact.notes || '').trim();
+            return text ? [{ text, updatedAt: contact.notesUpdatedAt || contact.updatedAt || null }] : [];
+        },
+        formatNoteTimestamp(note) {
+            if (!note || !note.updatedAt) return 'Date unknown';
+            const date = new Date(note.updatedAt);
+            return isNaN(date.getTime()) ? 'Date unknown' : date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        },
+        formatNotesTimestamp(contact) {
+            const arr = this.getNotesArray(contact);
+            if (arr.length === 0) return '—';
+            const latest = arr[arr.length - 1];
+            return this.formatNoteTimestamp(latest);
+        },
+        openListNotesModal(contact) {
+            this.listNotesModalContact = contact;
+            this.listNotesModalNewText = '';
+            this.listNotesModalAuthorName = '';
+            this.showListNotesModal = true;
+        },
+        closeListNotesModal() {
+            this.showListNotesModal = false;
+            this.listNotesModalContact = null;
+            this.listNotesModalNewText = '';
+            this.listNotesModalAuthorName = '';
+        },
+        async saveListNotesFromModal() {
+            if (!this.listNotesModalContact || !this.listNotesModalContact.id) return;
+            const newText = (this.listNotesModalNewText || '').trim();
+            const authorName = (this.listNotesModalAuthorName || '').trim();
+            if (!newText || !authorName) {
+                alert('Please enter your full name and the note text.');
+                return;
+            }
+            try {
+                this.savingListNotes = true;
+                const notesArray = this.getNotesArray(this.listNotesModalContact);
+                notesArray.push({ text: newText, updatedAt: new Date().toISOString(), authorName });
+                const res = await fetch(`/api/contacts/${this.listNotesModalContact.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ notes: notesArray })
+                });
+                if (res.ok) {
+                    const updated = await res.json();
+                    this.listNotesModalContact = updated;
+                    this.listNotesModalNewText = '';
+                    this.listNotesModalAuthorName = '';
+                    if (this.editingContact && this.editingContact.id === updated.id) this.editingContact.notes = updated.notes;
+                    if (this.viewingList) await this.viewList(this.viewingList.id);
+                } else {
+                    const err = await res.json();
+                    alert('Failed to save note: ' + (err.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to save note.');
+            } finally {
+                this.savingListNotes = false;
+            }
+        },
+        async saveContactEdit() {
+            if (!this.editingContact || !this.editingContact.id) return;
+            try {
+                this.savingContact = true;
+                const categories = this.editingContact.category
+                    ? this.editingContact.category.split(',').map(s => s.trim()).filter(Boolean)
+                    : (this.editingContact.categories || []);
+                const firstName = (this.editingContact.firstName || '').trim();
+                const lastName = (this.editingContact.lastName || '').trim();
+                const fullName = [firstName, lastName].filter(Boolean).join(' ') || undefined;
+                const body = {
+                    name: fullName,
+                    firstName: firstName || undefined,
+                    lastName: lastName || undefined,
+                    email: this.editingContact.email || undefined,
+                    phone: this.editingContact.phone || undefined,
+                    address: this.editingContact.address || undefined,
+                    city: this.editingContact.city || undefined,
+                    postalCode: this.editingContact.postalCode || this.editingContact.postal_code || undefined,
+                    pollNumber: this.editingContact.pollNumber || undefined,
+                    categories: categories
+                };
+                // Notes are edited only via the notes popup; do not overwrite from main form
+                const res = await fetch(`/api/contacts/${this.editingContact.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify(body)
+                });
+                if (res.ok) {
+                    this.closeEditContactModal();
+                    if (this.viewingList) await this.viewList(this.viewingList.id);
+                } else {
+                    const err = await res.json();
+                    alert('Failed to save contact: ' + (err.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to save contact.');
+            } finally {
+                this.savingContact = false;
+            }
+        },
+        async removeContactFromList(contactId) {
+            if (!this.viewingList || !this.isViewingListStatic) return;
+            const cfg = this.viewingList.filter_config || this.viewingList.filterConfig || {};
+            const currentIds = Array.isArray(cfg._staticContactIds) ? cfg._staticContactIds.slice() : [];
+            const newIds = currentIds.filter(id => String(id) !== String(contactId));
+            if (newIds.length === currentIds.length) return;
+            try {
+                const res = await fetch(`/api/election/lists/${this.viewingList.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        name: this.viewingList.name,
+                        description: this.viewingList.description,
+                        filterConfig: { _staticContactIds: newIds, _isStatic: true },
+                        contactIds: newIds
+                    })
+                });
+                if (res.ok) {
+                    await this.loadSavedLists();
+                    await this.viewList(this.viewingList.id);
+                } else {
+                    const err = await res.json();
+                    alert('Failed to remove contact: ' + (err.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to remove contact.');
+            }
+        },
+        async applyAddContactsSearch() {
+            try {
+                this.loadingAddContactsSearch = true;
+                this.addContactSearchResults = [];
+                this.addContactsSelectedIds = [];
+                const res = await fetch('/api/election/lists/contacts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        filterConfig: this.addContactSearch,
+                        limit: 500,
+                        offset: 0
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.addContactSearchResults = data.contacts || [];
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Search failed.');
+            } finally {
+                this.loadingAddContactsSearch = false;
+            }
+        },
+        async addSelectedContactsToList() {
+            if (!this.viewingList || this.addContactsSelectedIds.length === 0) return;
+            try {
+                this.addingContactsToList = true;
+                const existingIds = this.viewingListContacts.map(c => c.id);
+                const mergedIds = [...new Set(existingIds.concat(this.addContactsSelectedIds))];
+                const res = await fetch(`/api/election/lists/${this.viewingList.id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        name: this.viewingList.name,
+                        description: this.viewingList.description,
+                        filterConfig: { _staticContactIds: mergedIds, _isStatic: true },
+                        contactIds: mergedIds
+                    })
+                });
+                if (res.ok) {
+                    await this.loadSavedLists();
+                    this.addContactSearchResults = [];
+                    this.addContactsSelectedIds = [];
+                    this.showAddContactsToList = false;
+                    await this.viewList(this.viewingList.id);
+                    alert('Contacts added to list.');
+                } else {
+                    const err = await res.json();
+                    alert('Failed to add contacts: ' + (err.error || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to add contacts.');
+            } finally {
+                this.addingContactsToList = false;
+            }
+        },
+        async exportList(listId) {
+            try {
+                const response = await fetch(`/api/election/lists/${listId}`, {
+                    credentials: 'include'
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    const list = data.list;
+                    
+                    const contactsResponse = await fetch('/api/election/lists/contacts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify({
+                            filterConfig: list.filter_config || {},
+                            limit: 10000,
+                            offset: 0
+                        })
+                    });
+                    
+                    if (contactsResponse.ok) {
+                        const contactsData = await contactsResponse.json();
+                        const contacts = contactsData.contacts || [];
+                        
+                        const headers = ['Name', 'Email', 'Phone', 'Address', 'City', 'Province', 'Postal Code', 'Poll Number'];
+                        const rows = contacts.map(c => [
+                            c.name || (c.firstName + ' ' + c.lastName) || '',
+                            c.email || '',
+                            c.phone || '',
+                            c.address || '',
+                            c.city || '',
+                            c.province || '',
+                            c.postalCode || '',
+                            c.pollNumber || ''
+                        ]);
+                        
+                        const csv = [headers.join(','), ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+                        
+                        const blob = new Blob([csv], { type: 'text/csv' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${list.name || 'list'}_${new Date().toISOString().split('T')[0]}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        window.URL.revokeObjectURL(url);
+                    } else {
+                        alert('Failed to load contacts for export.');
+                    }
+                } else {
+                    alert('Failed to load list for export.');
+                }
+            } catch (error) {
+                console.error('Failed to export list:', error);
+                alert('Failed to export list. Please try again.');
+            }
+        }
+    },
+    computed: {
+        showViewContactsTable() {
+            return !this.loadingViewContacts && this.viewingListContacts.length > 0;
+        },
+        isViewingListStatic() {
+            const cfg = this.viewingList && (this.viewingList.filter_config || this.viewingList.filterConfig);
+            return cfg && Array.isArray(cfg._staticContactIds) && cfg._staticContactIds.length > 0;
+        },
+        editCategoryOptions() {
+            const list = this.availableCategories || [];
+            const current = (this.editingContact && this.editingContact.category) ? String(this.editingContact.category).trim() : '';
+            if (!current) return list;
+            if (list.indexOf(current) !== -1) return list;
+            return [current, ...list];
+        }
+    },
+    watch: {
+        selectedContactIds() {
+            // Update select all checkbox state
+            if (this.filteredContacts.length > 0) {
+                this.selectAllFiltered = this.selectedContactIds.length === this.filteredContacts.length;
+            }
+        }
+    }
+}).mount('#app');
+
+console.log('Vue app mounted successfully');
+</script>

@@ -1,0 +1,1617 @@
+<%- include('partials/nav') %>
+
+<div id="app" class="px-4 sm:px-6 lg:px-8" style="width: 100%; max-width: 80rem; margin-left: auto; margin-right: auto;">
+    <!-- Sending Overlay -->
+    <div v-if="isSending" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-8 max-w-sm mx-4 text-center shadow-xl">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-600 border-t-transparent mx-auto mb-4"></div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-2">Sending {{ messageType === 'email' ? 'Emails' : 'Messages' }}...</h3>
+            <p class="text-gray-600 text-sm">Please wait while your {{ messageType === 'email' ? 'email campaign' : 'messages' }} is being sent.</p>
+            <p class="text-gray-500 text-xs mt-2">This may take a few moments for large campaigns.</p>
+        </div>
+    </div>
+
+    <div class="py-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Message Composer -->
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Send Message</h2>
+                <div class="space-y-4">
+                    <!-- Update Message Type Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Message Type</label>
+                        <select v-model="messageType" 
+                                class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-2 border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                            <option value="sms">SMS</option>
+                            <option value="email">Email</option>
+                        </select>
+                    </div>
+
+                    <!-- Email Template Selection -->
+                    <div v-if="messageType === 'email'" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Email Template</label>
+                            <select v-model="selectedTemplate" 
+                                    @change="applyTemplate"
+                                    class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                <option value="">No Template (Plain Text)</option>
+                                <option v-for="template in availableTemplates" 
+                                        :key="template.id" 
+                                        :value="template">
+                                    {{ template.name }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Template Preview -->
+                        <div class="bg-white shadow rounded-lg p-6">
+                            <h3 class="text-lg font-medium mb-4">Preview</h3>
+                            <div class="border rounded-lg p-4">
+                                <!-- Email Preview -->
+                                <div v-if="messageType === 'email'" class="space-y-4">
+                                    <div class="border-b pb-2">
+                                        <div class="text-sm text-gray-600">From: {{ message.fromName }} <{{ message.fromEmail }}></div>
+                                        <div class="text-sm text-gray-600">Subject: {{ message.subject }}</div>
+                                    </div>
+                                    
+                                    <!-- Template Preview -->
+                                    <div v-if="selectedTemplate" class="space-y-4">
+                                        <!-- Header -->
+                                        <div v-if="selectedTemplate.headerImage || selectedTemplate.headerText" 
+                                             class="relative">
+                                            <img :src="selectedTemplate.headerImage" 
+                                                 class="w-full h-32 object-cover rounded-t-lg">
+                                            <div v-if="selectedTemplate.headerText" 
+                                                 class="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                                                <h1 class="text-2xl font-bold text-white">{{ selectedTemplate.headerText }}</h1>
+                                            </div>
+                                        </div>
+
+                                        <!-- Banner -->
+                                        <div v-if="selectedTemplate.bannerImage" class="w-full">
+                                            <img :src="selectedTemplate.bannerImage" 
+                                                 class="w-full object-cover rounded">
+                                        </div>
+
+                                        <!-- Body Content -->
+                                        <div class="space-y-4">
+                                            <template v-for="(element, index) in selectedTemplate.bodyElements" 
+                                                    :key="index">
+                                                <!-- Text Content -->
+                                                <div v-if="element.type === 'text'" 
+                                                     v-html="element.content"
+                                                     class="prose max-w-none"></div>
+                                                
+                                                <!-- Button -->
+                                                <div v-if="element.type === 'button'" 
+                                                     :class="element.alignment === 'center' ? 'text-center' : element.alignment === 'right' ? 'text-right' : 'text-left'">
+                                                    <p v-if="element.textAbove" class="mb-2 text-gray-700">{{ element.textAbove }}</p>
+                                                    <a :href="element.url" 
+                                                       class="inline-block bg-indigo-600 text-white px-6 py-2 rounded">
+                                                        {{ element.text }}
+                                                    </a>
+                                                </div>
+                                                
+                                                <!-- Image -->
+                                                <div v-if="element.type === 'image'" class="w-full">
+                                                    <img :src="element.url" 
+                                                         :alt="element.alt" 
+                                                         class="w-full object-cover rounded">
+                                                </div>
+                                            </template>
+                                        </div>
+
+                                        <!-- Footer -->
+                                        <div v-if="selectedTemplate.footerImage || selectedTemplate.footerText || selectedTemplate.footerLinks.length" 
+                                             class="border-t pt-4">
+                                            <!-- Footer Image and Text in side-by-side layout -->
+                                            <div v-if="selectedTemplate.footerImage || selectedTemplate.footerText"
+                                                 style="display: flex; flex-direction: row; gap: 16px; align-items: flex-start; margin-bottom: 16px;">
+                                                <img v-if="selectedTemplate.footerImage" 
+                                                     :src="selectedTemplate.footerImage" 
+                                                     style="max-width: 150px; height: auto; flex-shrink: 0;">
+                                                <div v-if="selectedTemplate && selectedTemplate.footerText"
+                                                     style="flex: 1; font-size: 14px; color: #6b7280; white-space: pre-line;">
+                                                    {{ selectedTemplate.footerText }}
+                                                </div>
+                                            </div>
+                                            <!-- Footer Links -->
+                                            <div v-if="selectedTemplate.footerLinks.length" 
+                                                 class="flex justify-center space-x-4">
+                                                <a v-for="link in selectedTemplate.footerLinks" 
+                                                   :key="link.url" 
+                                                   :href="link.url"
+                                                   class="text-indigo-600 hover:text-indigo-800">
+                                                    {{ link.text }}
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Custom Message Preview -->
+                                    <div v-else 
+                                         v-html="message.content"
+                                         class="prose max-w-none"></div>
+                                </div>
+
+                                <!-- SMS Preview -->
+                                <div v-else class="p-4 bg-gray-50 rounded">
+                                    {{ message.content }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- From Email Selection -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">From Email</label>
+                            <div v-if="verifiedSenders.length">
+                                <select v-model="message.fromEmail" 
+                                        class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                                    <option value="">Select a verified sender</option>
+                                    <option v-for="sender in verifiedSenders" 
+                                            :key="sender.id" 
+                                            :value="sender.EmailAddress">
+                                        {{ sender.EmailAddress }}
+                                    </option>
+                                </select>
+                            </div>
+                            <div v-else class="mt-1 text-sm text-red-600">
+                                You need to verify an email sender before sending emails.
+                                <template v-if="user && user.userType === 'app_owner'">
+                                    <a href="/my-numbers" class="text-indigo-600 hover:text-indigo-800">Add and verify a sender</a>
+                                </template>
+                                <template v-else>Contact your administrator to add a sender (Admin &gt; User Management).</template>
+                            </div>
+                        </div>
+
+                        <!-- From Name -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">From Name</label>
+                            <input v-model="message.fromName" 
+                                   type="text" 
+                                   class="mt-1 block w-full border rounded-md px-3 py-2"
+                                   placeholder="Your Name or Company">
+                        </div>
+
+                        <!-- Subject Line -->
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Subject</label>
+                            <input v-model="message.subject" 
+                                   type="text" 
+                                   class="mt-1 block w-full border rounded-md px-3 py-2"
+                                   placeholder="Email subject">
+                        </div>
+                    </div>
+
+                    <!-- Update the contact selection section -->
+                    <div class="bg-white shadow rounded-lg p-6">
+                        <h3 class="text-lg font-medium mb-4">Select Recipients</h3>
+                        
+                        <!-- Contact Selection Controls -->
+                        <div class="space-y-4 mb-4">
+                            <!-- Top Row: Select All and Count -->
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                <div class="flex items-center flex-wrap gap-x-4 gap-y-2">
+                                    <label class="inline-flex items-center text-sm font-medium">
+                                        <input type="checkbox" 
+                                               v-model="selectAllContacts"
+                                               @change="handleSelectAll"
+                                               :disabled="filteredContacts.length === 0"
+                                               class="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                                        <span class="ml-2">
+                                            Select All <span class="text-gray-500">({{ filteredContacts.length }})</span>
+                                        </span>
+                                    </label>
+                                    
+                                    <span class="text-sm px-3 py-1 rounded-full"
+                                          :class="selectedContacts.length > 0 ? 'bg-indigo-100 text-indigo-800 font-medium' : 'text-gray-500'">
+                                        {{ selectedContacts.length }} selected
+                                    </span>
+                                </div>
+
+                                <!-- Search Box -->
+                                <input v-model="contactSearch" 
+                                       type="text" 
+                                       class="border rounded-md px-3 py-2 w-full sm:w-64 min-w-0 text-sm" 
+                                       placeholder="Search contacts...">
+                            </div>
+
+                            <!-- Bottom Row: Category / City Filters (responsive) -->
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-2">
+                                <!-- Category Multi-Select -->
+                                <div class="w-full sm:w-1/2" ref="categoryDropdownContainer">
+                                    <div class="relative">
+                                        <button @click.stop="toggleCategoryDropdown"
+                                                type="button"
+                                                class="w-full border rounded-md px-3 py-2 text-sm sm:text-base min-w-0 text-left bg-white flex justify-between items-center hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                            <span v-if="contactFilter.length === 0" class="text-gray-500">All Categories</span>
+                                            <span v-else-if="contactFilter.length === 1">{{ contactFilter[0] }}</span>
+                                            <span v-else>{{ contactFilter.length }} categories selected</span>
+                                            <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                                 :class="{'transform rotate-180': showCategoryDropdown}">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </button>
+                                        <div v-show="showCategoryDropdown" 
+                                             @click.stop
+                                             class="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-xl max-h-64 overflow-y-auto"
+                                             style="max-height: 16rem;">
+                                            <div class="py-1">
+                                                <label v-for="category in uniqueCategories" 
+                                                       :key="category"
+                                                       class="flex items-center px-4 py-2 hover:bg-indigo-50 cursor-pointer transition-colors">
+                                                    <input type="checkbox" 
+                                                           :value="category"
+                                                           v-model="contactFilter"
+                                                           @change="updateFilteredContacts"
+                                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mr-3 h-4 w-4">
+                                                    <span class="text-sm text-gray-700">{{ category }}</span>
+                                                </label>
+                                                <div v-if="uniqueCategories.length === 0" class="px-4 py-3 text-sm text-gray-500 text-center">
+                                                    No categories available
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- City Multi-Select -->
+                                <div class="w-full sm:w-1/2" ref="cityDropdownContainer">
+                                    <div class="relative">
+                                        <button @click.stop="toggleCityDropdown"
+                                                type="button"
+                                                class="w-full border rounded-md px-3 py-2 text-sm sm:text-base min-w-0 text-left bg-white flex justify-between items-center hover:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                            <span v-if="cityFilter.length === 0" class="text-gray-500">All Cities</span>
+                                            <span v-else-if="cityFilter.length === 1">{{ cityFilter[0] }}</span>
+                                            <span v-else>{{ cityFilter.length }} cities selected</span>
+                                            <svg class="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                                 :class="{'transform rotate-180': showCityDropdown}">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                            </svg>
+                                        </button>
+                                        <div v-show="showCityDropdown" 
+                                             @click.stop
+                                             class="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-md shadow-xl max-h-64 overflow-y-auto"
+                                             style="max-height: 16rem;">
+                                            <div class="py-1">
+                                                <label v-for="city in uniqueCities" 
+                                                       :key="city"
+                                                       class="flex items-center px-4 py-2 hover:bg-indigo-50 cursor-pointer transition-colors">
+                                                    <input type="checkbox" 
+                                                           :value="city"
+                                                           v-model="cityFilter"
+                                                           @change="updateFilteredContacts"
+                                                           class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 mr-3 h-4 w-4">
+                                                    <span class="text-sm text-gray-700">{{ city }}</span>
+                                                </label>
+                                                <div v-if="uniqueCities.length === 0" class="px-4 py-3 text-sm text-gray-500 text-center">
+                                                    No cities available
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Filtered Contact Count -->
+                            <div class="flex items-center justify-between py-2 px-3 bg-gray-50 rounded text-sm">
+                                <span class="text-gray-700">
+                                    <strong>{{ filteredContacts.length }}</strong> 
+                                    {{ filteredContacts.length === 1 ? 'contact' : 'contacts' }} matching filters
+                                </span>
+                                <span v-if="contactFilter.length > 0 || cityFilter.length > 0" 
+                                      class="text-xs text-gray-500">
+                                    ({{ contactFilter.length }} {{ contactFilter.length === 1 ? 'category' : 'categories' }}, 
+                                    {{ cityFilter.length }} {{ cityFilter.length === 1 ? 'city' : 'cities' }})
+                                </span>
+                            </div>
+                            
+                            <!-- Active Filters Display -->
+                            <div v-if="contactFilter.length > 0 || cityFilter.length > 0" 
+                                 class="flex flex-wrap gap-2 mt-2">
+                                <span class="text-xs font-medium text-gray-600">Active filters:</span>
+                                <span v-for="category in contactFilter" 
+                                      :key="'cat-' + category"
+                                      class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 font-medium">
+                                    {{ category }}
+                                    <button @click="removeCategory(category)" 
+                                            type="button"
+                                            class="ml-1 hover:text-indigo-600 focus:outline-none">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </span>
+                                <span v-for="city in cityFilter" 
+                                      :key="'city-' + city"
+                                      class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-100 text-green-800 font-medium">
+                                    {{ city }}
+                                    <button @click="removeCity(city)" 
+                                            type="button"
+                                            class="ml-1 hover:text-green-600 focus:outline-none">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                    </button>
+                                </span>
+                                <button @click="clearAllFilters" 
+                                        type="button"
+                                        class="text-xs text-indigo-600 hover:text-indigo-800 underline font-medium">
+                                    Clear all filters
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Contact List with Virtual Scrolling -->
+                        <div class="border rounded-lg h-64 overflow-auto">
+                            <div v-if="loading" class="flex items-center justify-center h-full">
+                                <span class="text-gray-500">Loading contacts...</span>
+                            </div>
+                            <template v-else>
+                                <div class="divide-y">
+                                    <div v-for="(contact, index) in paginatedContacts" 
+                                         :key="contact.id"
+                                         class="p-2 hover:bg-gray-50 flex items-center">
+                                        <input type="checkbox" 
+                                               :value="contact.id"
+                                               v-model="selectedContacts"
+                                               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                        <span class="ml-2">
+                                            {{ contact.firstName }} {{ contact.lastName }}
+                                            <span class="text-gray-500 text-sm">
+                                                ({{ messageType === 'email' ? contact.email : contact.phone }})
+                                            </span>
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Load More Button -->
+                                <div v-if="hasMoreContacts" 
+                                     class="p-2 text-center">
+                                    <button @click="loadMoreContacts" 
+                                            class="text-indigo-600 hover:text-indigo-800">
+                                        Load More
+                                    </button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Only show content field for SMS or when no template is selected -->
+                    <div v-if="messageType === 'sms' || !selectedTemplate">
+                        <label class="block text-sm font-medium text-gray-700">Message Content</label>
+                        <div class="mt-1 relative">
+                            <textarea v-model="message.content" 
+                                      @input="checkMessageLength"
+                                      :maxlength="messageType === 'sms' ? 160 : null"
+                                      class="shadow-sm block w-full sm:text-sm border-gray-300 rounded-md"
+                                      :class="{'border-red-300': isOverLimit}"
+                                      rows="4"
+                                      placeholder="Enter your message"></textarea>
+                            <div v-if="messageType === 'sms'" 
+                                 class="mt-1 text-sm"
+                                 :class="{'text-red-600': isOverLimit, 'text-gray-500': !isOverLimit}">
+                                {{ message.content.length }}/160 characters
+                                <span v-if="isOverLimit" class="text-red-600">
+                                    (Message too long for single SMS)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex justify-between items-center">
+                        <span>Cost: {{ selectedContacts.length }} tokens</span>
+                        <button @click="confirmAndSendMessage" class="bg-indigo-600 text-white px-4 py-2 rounded">Send</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Message History -->
+            <div class="bg-white shadow rounded-lg p-4 !important" style="display: block !important;">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-lg font-semibold !important" style="display: block !important;">SMS Messages Dashboard</h2>
+                    <button @click="refreshMessages" 
+                            class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 !important"
+                            style="display: inline-block !important;">
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Contact Search Section -->
+                    <div class="mb-4 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="text-md font-medium text-gray-900 mb-3">Search Contact Campaign Status</h3>
+                        <div class="flex flex-col sm:flex-row gap-2 mb-3">
+                            <input v-model="contactSearchQuery" 
+                                   type="text" 
+                                   placeholder="Search by contact name or email/phone"
+                                   class="w-full sm:flex-1 border rounded-md px-3 py-2 text-sm min-w-0">
+                            <div class="flex flex-col sm:flex-row gap-2 sm:w-auto">
+                                <button @click="searchContactStatus" 
+                                        class="w-full sm:w-auto px-3 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
+                                    Search
+                                </button>
+                                <button @click="clearContactSearch"
+                                        :disabled="!contactSearchQuery && contactSearchResults.length === 0"
+                                        class="w-full sm:w-auto px-3 py-2 text-sm rounded border hover:bg-gray-100 disabled:opacity-50">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    
+                    <!-- Contact Status Results -->
+                    <div v-if="contactSearchResults.length > 0" class="mt-4">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Campaign Status for "{{ contactSearchQuery }}"</h4>
+                        <div class="space-y-2">
+                            <div v-for="result in contactSearchResults" 
+                                 :key="result.contactId" 
+                                 class="bg-white p-3 rounded border">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="font-medium text-sm">
+                                        {{ result.contactName }}
+                                    </div>
+                                    <span class="text-xs text-gray-500">
+                                        {{ result.contactInfo }}
+                                    </span>
+                                </div>
+                                
+                                <!-- SMS Campaigns -->
+                                <div v-if="result.smsCampaigns.length > 0">
+                                    <div class="text-xs font-medium text-gray-600 mb-1">SMS Campaigns:</div>
+                                    <div v-for="campaign in result.smsCampaigns" 
+                                         :key="campaign.sid" 
+                                         class="text-xs ml-2 mb-1">
+                                        <span class="font-medium">{{ campaign.body.substring(0, 50) }}{{ campaign.body.length > 50 ? '...' : '' }}</span>
+                                        <span class="text-gray-500"> - Sent: {{ new Date(campaign.timestamp || campaign.dateSent).toLocaleDateString() }}</span>
+                                        <span :class="[
+                                            'ml-2',
+                                            (campaign.status === 'delivered' || campaign.status === 'sent') ? 'text-green-600' : 
+                                            campaign.status === 'failed' ? 'text-red-600' : 'text-yellow-600'
+                                        ]">
+                                            {{ campaign.status === 'delivered' ? '✓ Delivered' : 
+                                               campaign.status === 'sent' ? '✓ Sent' :
+                                               campaign.status === 'failed' ? '✗ Failed' : '○ Pending' }}
+                                        </span>
+                                        <span v-if="campaign.linkClicks && campaign.linkClicks.length" class="ml-2 text-green-600">✓ Clicked</span>
+                                    </div>
+                                </div>
+                                
+                                <div v-else class="text-xs text-gray-500 italic">
+                                    No SMS campaigns found for this contact
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div v-else-if="contactSearchQuery && !isSearching" class="mt-4 text-sm text-gray-500">
+                        No contacts found matching "{{ contactSearchQuery }}"
+                    </div>
+                    
+                    <div v-if="isSearching" class="mt-4 text-sm text-gray-500">
+                        Searching...
+                    </div>
+                </div>
+
+                <div class="space-y-3 !important" style="display: block !important;">
+                    <!-- Message Type Filter -->
+                    <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <h4 class="text-sm font-medium text-gray-700 mb-2">Filter Messages</h4>
+                        <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                            <div class="flex space-x-2">
+                                <button 
+                                    v-for="type in ['all', 'sent', 'received']" 
+                                    :key="type"
+                                    @click="filterType = type"
+                                    :class="[
+                                        'px-2 py-1 rounded text-sm',
+                                        filterType === type ? 'bg-indigo-600 text-white' : 'bg-gray-200'
+                                    ]"
+                                >
+                                    {{ type.toUpperCase() }}
+                                </button>
+                            </div>
+
+                            <button @click="clearMessageFilters"
+                                    class="px-3 py-2 text-sm border rounded hover:bg-gray-100">
+                                Clear
+                            </button>
+                        </div>
+                        
+                        <!-- Message Summary -->
+                        <div v-if="messages.length > 0" class="mt-3 p-2 bg-white rounded border">
+                            <div class="flex flex-wrap gap-4 text-xs">
+                                <span class="flex items-center">
+                                    <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                                    <span class="text-gray-600">Sent: {{ getFilteredDirectionCount('sent') }}</span>
+                                </span>
+                                <span class="flex items-center">
+                                    <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                    <span class="text-gray-600">Received: {{ getFilteredDirectionCount('received') }}</span>
+                                </span>
+                                <span class="flex items-center">
+                                    <span class="w-2 h-2 bg-gray-500 rounded-full mr-2"></span>
+                                    <span class="text-gray-600">Total: {{ filteredMessages.length }}</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 !important" style="display: block !important;">
+                        <!-- No messages state -->
+                        <div v-if="filteredMessages.length === 0" class="text-center py-8 text-gray-500 !important" style="display: block !important;">
+                            <div class="text-lg mb-2 !important">No messages found</div>
+                            <div class="text-sm !important">
+                                <span v-if="filterType === 'all'">No messages in history</span>
+                                <span v-else-if="filterType === 'sent'">No sent messages</span>
+                                <span v-else-if="filterType === 'received'">No received messages</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Messages list -->
+                        <div v-for="message in paginatedMessages" 
+                             :key="message.id" 
+                             class="border rounded p-2 text-sm !important"
+                             :class="{
+                                 'bg-blue-50 !important': message.type === 'outbound',
+                                 'bg-green-50 !important': message.type === 'inbound'
+                             }"
+                             style="display: block !important; margin-bottom: 8px !important;">
+                            <div class="flex justify-between text-gray-600 mb-1">
+                                <div>
+                                    <span class="font-medium">
+                                        <span v-if="message.type === 'inbound'">SMS From:</span>
+                                        <span v-else>SMS To:</span>
+                                    </span>
+                                    <span v-if="message.type === 'inbound'">
+                                        {{ getContactDisplayName(message.from) }}
+                                    </span>
+                                    <span v-else>
+                                        {{ Array.isArray(message.to) ? 
+                                            (message.to.length > 1 ? 
+                                                `${message.to.length} recipients` : 
+                                                getContactDisplayName(message.to[0])) 
+                                            : getContactDisplayName(message.to) }}
+                                    </span>
+                                </div>
+                                <span>{{ new Date(message.timestamp).toLocaleString() }}</span>
+                            </div>
+                            <div class="text-gray-900">
+                                {{ message.content || message.body }}
+                            </div>
+                            <div class="flex justify-between items-center">
+                                    <div class="text-xs text-gray-500 mt-1">
+                                        Status: {{ message.status }}
+                                        <span v-if="message.linkClicks && message.linkClicks.length" class="ml-2 text-green-600">✓ Clicked</span>
+                                    </div>
+                                <button v-if="message.type === 'inbound'"
+                                        @click="replyToMessage(message)"
+                                        class="text-xs text-indigo-600 hover:text-indigo-800 mt-1 flex items-center">
+                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                    </svg>
+                                    Reply
+                                </button>
+                            </div>
+                        </div>
+                        <!-- History pagination controls -->
+                        <div class="flex items-center justify-between mt-3">
+                            <div class="text-xs text-gray-600">
+                                Page {{ historyPage }} of {{ totalMessagePages }} · {{ filteredMessages.length }} total
+                            </div>
+                            <div class="space-x-2">
+                                <button @click="prevHistoryPage" 
+                                        :disabled="historyPage <= 1"
+                                        class="px-3 py-1 text-sm border rounded disabled:opacity-50">
+                                    Previous
+                                </button>
+                                <button @click="nextHistoryPage" 
+                                        :disabled="historyPage >= totalMessagePages"
+                                        class="px-3 py-1 text-sm border rounded disabled:opacity-50">
+                                    Next
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue
+
+createApp({
+    data() {
+        return {
+            messageType: 'sms',
+            message: {
+                fromEmail: '',
+                fromName: '',
+                subject: '',
+                content: ''
+            },
+            selectedContacts: [],
+            contacts: [],
+            messages: [],
+            filterType: 'all',
+            user: null,
+            tokenBalance: 0,
+            isAllSelected: false,
+            templates: [],
+            selectedTemplate: null,
+            hasDefaultNumber: false,
+            isOverLimit: false,
+            cityFilter: [],
+            contactFilter: [],
+            categoryFilter: '',
+            recipientSearch: '',
+            phoneSearch: '',
+            showCategoryDropdown: false,
+            showCityDropdown: false,
+            isSending: false,
+            defaultTemplate: {
+                id: 'default',
+                name: 'Basic Marketing Template',
+                headerText: 'Campaign Builder',
+                headerImage: 'https://images.unsplash.com/photo-1557804506-669a67965ba0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2074&q=80',
+                bannerImage: '',
+                bodyElements: [
+                    {
+                        type: 'text',
+                        content: 'Thank you for being a valued customer. We appreciate your business.'
+                    },
+                    {
+                        type: 'button',
+                        text: 'Visit Our Website',
+                        url: 'https://swiftmedia.ca'
+                    }
+                ],
+                footerImage: '',
+                footerText: '',
+                footerLinks: [
+                    {
+                        text: 'Privacy Policy',
+                        url: '#'
+                    },
+                    {
+                        text: 'Unsubscribe',
+                        url: '#'
+                    }
+                ],
+                style: {
+                    headerOverlay: 'bg-gradient-to-r from-indigo-900 to-indigo-600 mix-blend-multiply',
+                    headerTextColor: 'text-white'
+                },
+                updatedAt: new Date().toISOString()
+            },
+            verifiedSenders: [],
+            selectAllContacts: false,
+            contactSearch: '',
+            contactFilter: '',
+            loading: false,
+            currentPage: 1,
+            contactsPerPage: 100,
+            contactSearchQuery: '',
+            contactSearchResults: [],
+            isSearching: false,
+            // Message history pagination
+            historyPage: 1,
+            historyPageSize: 25
+        }
+    },
+    computed: {
+        filteredMessages() {
+            let smsMessages = (this.messages || []).filter(m => 
+                m.type === 'outbound' || m.type === 'inbound'
+            );
+
+            smsMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+            if (this.filterType === 'received') {
+                smsMessages = smsMessages.filter(m => m.type === 'inbound');
+            } else if (this.filterType === 'sent') {
+                smsMessages = smsMessages.filter(m => m.type === 'outbound');
+            }
+            
+            return smsMessages;
+        },
+        paginatedMessages() {
+            const start = (this.historyPage - 1) * this.historyPageSize;
+            const end = start + this.historyPageSize;
+            return this.filteredMessages.slice(start, end);
+        },
+        totalMessagePages() {
+            return Math.max(1, Math.ceil(this.filteredMessages.length / this.historyPageSize));
+        },
+        uniqueCities() {
+            return [...new Set(this.contacts
+                .map(c => c.city)
+                .filter(Boolean)
+                .sort()
+            )];
+        },
+        uniqueCategories() {
+            // Extract all categories from all contacts (categories is an array)
+            const allCategories = this.contacts
+                .flatMap(c => c.categories || [])
+                .filter(Boolean);
+            
+            // Return unique sorted categories
+            return [...new Set(allCategories)].sort();
+        },
+        filteredRecipients() {
+            let contacts = this.contacts;
+
+            if (this.messageType === 'sms') {
+                // SMS filtering
+                if (this.recipientSearch) {
+                    const search = this.recipientSearch.toLowerCase();
+                    contacts = contacts.filter(contact => 
+                        contact.firstName.toLowerCase().includes(search) ||
+                        contact.lastName.toLowerCase().includes(search)
+                    );
+                }
+                
+                if (this.phoneSearch) {
+                    const search = this.phoneSearch.replace(/\D/g, '');
+                    contacts = contacts.filter(contact => 
+                        contact.phone.replace(/\D/g, '').includes(search)
+                    );
+                }
+            } else {
+                // Email filtering - only show contacts with email addresses
+                contacts = contacts.filter(c => c.email && c.email.trim());
+            }
+
+            // Apply city and category filters for both SMS and email (multi-select support)
+            if (this.cityFilter.length > 0) {
+                contacts = contacts.filter(c => this.cityFilter.includes(c.city));
+            }
+            if (this.contactFilter.length > 0) {
+                contacts = contacts.filter(c => 
+                    Array.isArray(c.categories) && 
+                    c.categories.some(cat => this.contactFilter.includes(cat))
+                );
+            }
+            
+            return contacts;
+        },
+        availableTemplates() {
+            return [this.defaultTemplate, ...this.templates];
+        },
+        filteredContacts() {
+            return this.contacts.filter(contact => {
+                // Basic search match
+                const searchMatch = !this.contactSearch || 
+                    `${contact.firstName} ${contact.lastName} ${contact.email} ${contact.phone}`
+                        .toLowerCase()
+                        .includes(this.contactSearch.toLowerCase());
+                
+                // Category match - if no categories selected, show all
+                // If categories selected, contact must have at least one matching category
+                const categoryMatch = this.contactFilter.length === 0 || 
+                    (Array.isArray(contact.categories) && 
+                     contact.categories.some(cat => this.contactFilter.includes(cat)));
+                
+                // City match - if no cities selected, show all
+                // If cities selected, contact's city must be in the selected cities
+                const cityMatch = this.cityFilter.length === 0 || 
+                    this.cityFilter.includes(contact.city);
+                
+                // Contact type match (email or phone)
+                const contactTypeMatch = this.messageType === 'email' ? 
+                    (contact.email && contact.email.trim()) : 
+                    (contact.phone && contact.phone.trim());
+
+                return searchMatch && categoryMatch && cityMatch && contactTypeMatch;
+            });
+        },
+        paginatedContacts() {
+            const start = 0;
+            const end = this.currentPage * this.contactsPerPage;
+            return this.filteredContacts.slice(start, end);
+        },
+        hasMoreContacts() {
+            return this.paginatedContacts.length < this.filteredContacts.length;
+        }
+    },
+    methods: {
+        selectAllContacts() {
+            if (this.selectAllContacts) {
+                this.selectedContacts = this.filteredContacts.map(c => c.id);
+            } else {
+                this.selectedContacts = [];
+            }
+        },
+        confirmAndSendMessage() {
+            if (this.messageType === 'sms') {
+                if (confirm('Are you sure you want to send this SMS message?')) {
+                    this.sendMessage();
+                }
+            } else if (this.messageType === 'email') {
+                if (confirm('Are you sure you want to send this email message?')) {
+                    this.sendMessage();
+                }
+            }
+        },
+        async sendMessage() {
+            if (!this.selectedContacts.length) {
+                alert('Please select at least one recipient');
+                return;
+            }
+
+            // Show sending overlay
+            this.isSending = true;
+
+            try {
+                // Convert selected IDs to full contact objects
+                const selectedContactObjects = this.contacts.filter(contact => 
+                    this.selectedContacts.includes(contact.id)
+                );
+
+                if (this.messageType === 'email') {
+                    // For email messages - normalize, validate, and deduplicate
+                    const recipients = selectedContactObjects
+                        .filter(contact => {
+                            const email = contact.email;
+                            return email && typeof email === 'string' && email.trim().length > 0;
+                        })
+                        .map(contact => contact.email.trim().toLowerCase())
+                        .filter((email, index, self) => self.indexOf(email) === index); // Remove duplicates
+
+                    if (!recipients.length) {
+                        throw new Error('No valid email addresses found in selected contacts');
+                    }
+
+                    const response = await fetch('/api/messages/send-email', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        },
+                        body: JSON.stringify({
+                            to: recipients,
+                            subject: this.message.subject,
+                            content: this.message.content,
+                            fromEmail: this.message.fromEmail,
+                            fromName: this.message.fromName,
+                            templateName: this.selectedTemplate?.name
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        console.error('Email send error:', error);
+                        
+                        // Provide more helpful error messages
+                        if (error.error && error.error.includes('authentication failed')) {
+                            throw new Error('Email service is currently unavailable due to authentication issues. Please contact support to resolve this.');
+                        } else if (error.error && error.error.includes('No sender emails')) {
+                            throw new Error('No verified sender emails available. Please add and verify a sender email in Sender Settings.');
+                        } else if (error.error && error.error.includes('No valid email addresses')) {
+                            throw new Error('No valid email addresses found in selected contacts. Please check your contact data.');
+                        } else {
+                            throw new Error(error.error);
+                        }
+                    }
+
+                    const result = await response.json();
+                    
+                    // Check if this is a large campaign being processed asynchronously
+                    if (result.processing) {
+                        // Hide sending overlay
+                        this.isSending = false;
+                        
+                        // Show toast notification for async processing
+                        this.showToast(
+                            `Email campaign queued! ${result.stats.queuedRecipients} emails are being sent in the background. This may take several minutes. You can continue using the app.`,
+                            'info',
+                            15000 // Show for 15 seconds
+                        );
+                        
+                        // Start polling for completion (every 10 seconds)
+                        this.pollCampaignStatus(result.campaignId, recipients.length);
+                        
+                        // Clear form immediately for large campaigns
+                        this.clearForm();
+                        return; // Don't show success alert, toast is enough
+                    }
+                    
+                    // Process the results for synchronous sends
+                    if (result.stats) {
+                        // Stats processed
+                    }
+
+                } else {
+                    // For SMS messages
+                    const recipients = selectedContactObjects
+                        .filter(contact => contact.phone)
+                        .map(contact => contact.phone);
+
+                    if (!recipients.length) {
+                        throw new Error('No valid phone numbers found in selected contacts');
+                    }
+
+                    const response = await fetch('/api/messages/send-sms', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${localStorage.getItem('token')}`
+                        },
+                        body: JSON.stringify({
+                            to: recipients,
+                            content: this.message.content
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        console.error('SMS send error:', error);
+                        
+                        // Provide more helpful error messages
+                        if (error.error && error.error.includes('authentication failed')) {
+                            throw new Error('SMS service is currently unavailable due to authentication issues. Please contact support to resolve this.');
+                        } else if (error.error && error.error.includes('No phone numbers')) {
+                            throw new Error('No phone numbers available for sending SMS. Please add a phone number in Sender Settings.');
+                        } else {
+                            throw new Error(error.error);
+                        }
+                    }
+
+                    const result = await response.json();
+                }
+
+                // Hide sending overlay
+                this.isSending = false;
+
+                // Clear form after successful send
+                this.clearForm();
+                
+                // Reload data to update history and statistics
+                await this.loadUserData();
+                await this.loadMessages();
+                
+                // Show success message (use toast for better UX)
+                this.showToast('Message sent successfully!', 'success');
+
+            } catch (error) {
+                // Hide sending overlay
+                this.isSending = false;
+                
+                console.error('Send message error:', error);
+                // Show error toast instead of alert
+                this.showToast(error.message || 'Failed to send message. Please try again.', 'error', 8000);
+            }
+        },
+        showToast(message, type = 'info', duration = 5000) {
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-sm transition-all duration-300 ${
+                type === 'success' ? 'bg-green-500 text-white' :
+                type === 'error' ? 'bg-red-500 text-white' :
+                type === 'warning' ? 'bg-yellow-500 text-white' :
+                'bg-blue-500 text-white'
+            }`;
+            
+            toast.innerHTML = `
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium">${message}</span>
+                    <button class="ml-4 text-white hover:text-gray-200" onclick="this.parentElement.parentElement.remove()">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Auto-remove after duration
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, duration);
+        },
+        clearForm() {
+            // Clear form after successful send
+            this.message = { 
+                content: '', 
+                subject: '', 
+                fromEmail: '', 
+                fromName: '' 
+            };
+            this.selectedContacts = [];
+            this.selectAllContacts = false;
+            this.selectedTemplate = null;
+            this.contactSearch = '';
+            this.contactFilter = [];
+            this.cityFilter = [];
+            
+            // Force Vue to update the UI immediately
+            this.$nextTick(() => {
+                // Clear any input fields that might not be bound
+                const textareas = document.querySelectorAll('textarea');
+                const inputs = document.querySelectorAll('input[type="text"], input[type="email"]');
+                
+                textareas.forEach(textarea => {
+                    textarea.value = '';
+                    textarea.style.borderColor = '';
+                });
+                
+                inputs.forEach(input => {
+                    if (input.name !== 'contactSearch' && input.name !== 'contactFilter' && input.name !== 'cityFilter') {
+                        input.value = '';
+                    }
+                });
+            });
+        },
+        async pollCampaignStatus(campaignId, totalRecipients) {
+            // Poll every 10 seconds to check if campaign is complete
+            const maxPolls = 60; // Poll for up to 10 minutes (60 * 10 seconds)
+            let pollCount = 0;
+            
+            const pollInterval = setInterval(async () => {
+                pollCount++;
+                
+                try {
+                    // Load user data to check for updated campaign status
+                    await this.loadUserData();
+                    
+                    // Check if we should stop polling (campaign complete or max polls reached)
+                    if (pollCount >= maxPolls) {
+                        clearInterval(pollInterval);
+                        this.showToast('Campaign processing is taking longer than expected. Please refresh the page to see the latest status.', 'warning', 10000);
+                        return;
+                    }
+                    
+                    // Reload messages to check campaign status
+                    // The campaign should be in the email campaigns list with status 'sent' or 'partial'
+                    // For now, we'll just reload data periodically
+                    if (pollCount % 6 === 0) { // Every minute, reload messages
+                        await this.loadMessages();
+                    }
+                } catch (error) {
+                    console.error('Error polling campaign status:', error);
+                }
+            }, 10000); // Poll every 10 seconds
+            
+            // Also reload data immediately after a short delay
+            setTimeout(async () => {
+                await this.loadUserData();
+                await this.loadMessages();
+            }, 30000); // After 30 seconds
+        },
+        async loadMessages() {
+            try {
+                const token = localStorage.getItem('token');
+                const headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const smsResponse = await fetch('/api/messages/sms/history', {
+                    credentials: 'include',
+                    headers
+                });
+
+                if (smsResponse.status === 401) {
+                    if (window.redirectToLogin) window.redirectToLogin('no_token', { from: 'messages' });
+                    else window.location.replace('/login?loop=1&reason=no_token&from=messages');
+                    return;
+                }
+
+                let smsMessages = [];
+
+                if (smsResponse.ok) {
+                    const smsData = await smsResponse.json();
+                    smsMessages = [
+                        ...smsData.sent.map(m => ({ ...m, type: 'outbound' })),
+                        ...smsData.received.map(m => ({ ...m, type: 'inbound' }))
+                    ];
+                }
+                
+                this.messages = smsMessages.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            } catch (error) {
+                console.error('Failed to load messages:', error);
+            }
+        },
+        logout() {
+            localStorage.removeItem('token');
+            if (window.redirectToLogin) window.redirectToLogin('logout', { from: 'messages' });
+            else window.location.replace('/login?loop=1&reason=logout&from=messages');
+        },
+        applyTemplate() {
+            if (this.selectedTemplate) {
+                // Generate HTML content from template with proper document structure
+                let content = '';
+                
+                // Add header
+                if (this.selectedTemplate.headerImage || this.selectedTemplate.headerText) {
+                    content += '<div style="position:relative;">';
+                    if (this.selectedTemplate.headerImage) {
+                        content += `<img src="${this.selectedTemplate.headerImage}" style="width:100%; max-height:200px; object-fit:cover;">\n`;
+                    }
+                    if (this.selectedTemplate.headerText) {
+                        content += `<div style="position:absolute; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center;">`;
+                        content += `<h1 style="color:white; font-size:24px; font-weight:bold;">${this.selectedTemplate.headerText}</h1>`;
+                        content += '</div>';
+                    }
+                    content += '</div>\n';
+                }
+                
+                // Add banner
+                if (this.selectedTemplate.bannerImage) {
+                    content += `<img src="${this.selectedTemplate.bannerImage}" style="width:100%; margin:20px 0;">\n`;
+                }
+                
+                // Add body elements
+                this.selectedTemplate.bodyElements.forEach(element => {
+                    switch (element.type) {
+                        case 'text':
+                            // Check if content already contains HTML tags
+                            if (element.content.includes('<') && element.content.includes('>')) {
+                                // Content is already HTML, use it directly
+                                content += element.content + '\n';
+                            } else {
+                                // Content is plain text, wrap in paragraph
+                                content += `<p style="margin:16px 0; color:#374151;">${element.content}</p>\n`;
+                            }
+                            break;
+                        case 'button':
+                            const buttonAlignment = element.alignment === 'center' ? 'text-align:center;' : 
+                                                    element.alignment === 'right' ? 'text-align:right;' : 'text-align:left;';
+                            let buttonContent = `<div style="margin:16px 0; ${buttonAlignment}">\n`;
+                            if (element.textAbove) {
+                                buttonContent += `<p style="margin-bottom:8px; color:#374151;">${element.textAbove}</p>\n`;
+                            }
+                            buttonContent += `<a href="${element.url}" style="display:inline-block; padding:10px 20px; background-color:#4F46E5; color:white; text-decoration:none; border-radius:4px;">${element.text}</a>\n`;
+                            buttonContent += `</div>\n`;
+                            content += buttonContent;
+                            break;
+                        case 'image':
+                            content += `<img src="${element.url}" alt="${element.alt}" style="max-width:100%; margin:16px 0;">\n`;
+                            break;
+                    }
+                });
+                
+                // Add footer
+                if (this.selectedTemplate.footerImage || this.selectedTemplate.footerText || this.selectedTemplate.footerLinks.length > 0) {
+                    content += '<div style="margin-top:32px; border-top:1px solid #E5E7EB; padding-top:20px;">';
+                    
+                    // Footer content in side-by-side layout (image left, text right)
+                    if (this.selectedTemplate.footerImage || this.selectedTemplate.footerText) {
+                        content += '<table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;"><tr>';
+                        
+                        // Footer Image (Left Side) - use table for email compatibility
+                        if (this.selectedTemplate.footerImage) {
+                            content += `<td style="width:150px; vertical-align:top; padding-right:20px;">`;
+                            content += `<img src="${this.selectedTemplate.footerImage}" style="max-width:150px; height:auto; display:block;" alt="Footer image">`;
+                            content += `</td>`;
+                        }
+                        
+                        // Footer Text (Right Side)
+                        if (this.selectedTemplate.footerText) {
+                            content += `<td style="vertical-align:top; font-size:14px; color:#6b7280;">`;
+                            // Convert newlines to <br> for proper display in emails
+                            const footerTextHtml = this.selectedTemplate.footerText.replace(/\n/g, '<br>');
+                            content += footerTextHtml;
+                            content += `</td>`;
+                        }
+                        
+                        content += '</tr></table>';
+                    }
+                    
+                    // Footer Links (Below)
+                    if (this.selectedTemplate.footerLinks.length > 0) {
+                        content += '<div style="text-align:center;">';
+                        this.selectedTemplate.footerLinks.forEach(link => {
+                            content += `<a href="${link.url}" style="color:#4F46E5; text-decoration:none; margin:0 8px;">${link.text}</a>`;
+                        });
+                        content += '</div>';
+                    }
+                    content += '</div>';
+                }
+                
+                // Wrap content in proper HTML document structure
+                const htmlContent = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>${this.selectedTemplate.name}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif;">
+    <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+        ${content}
+    </div>
+</body>
+</html>`;
+                
+                this.message.content = htmlContent;
+                this.message.subject = this.message.subject || this.selectedTemplate.name;
+            }
+        },
+        async loadTemplates() {
+            try {
+                const token = localStorage.getItem('token');
+                const headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const response = await fetch('/api/templates', {
+                    credentials: 'include',
+                    headers
+                });
+                if (response.ok) {
+                    this.templates = await response.json();
+                }
+            } catch (error) {
+                console.error('Failed to load templates:', error);
+            }
+        },
+        async loadUserData() {
+            try {
+                const token = localStorage.getItem('token');
+                const headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const response = await fetch('/api/user', {
+                    credentials: 'include',
+                    headers
+                });
+                if (response.ok) {
+                    const userData = await response.json();
+                    this.user = userData;
+                    // Don't override messages here - let loadMessages() handle it
+                }
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            }
+        },
+        checkMessageLength() {
+            if (this.messageType === 'sms') {
+                this.isOverLimit = this.message.content.length > 160;
+                
+                // Truncate if over limit
+                if (this.message.content.length > 160) {
+                    this.message.content = this.message.content.substring(0, 160);
+                }
+            }
+        },
+        formatPhoneNumber(phone) {
+            // Remove any non-digit characters and the leading '1' or '+1' if present
+            const cleaned = phone.replace(/^\+?1?/, '').replace(/\D/g, '');
+            // Format as (XXX) XXX-XXXX
+            return `(${cleaned.slice(0,3)}) ${cleaned.slice(3,6)}-${cleaned.slice(6)}`;
+        },
+        getContactDisplayName(identifier) {
+            if (!identifier) return 'Unknown';
+            
+            // Clean the identifier (remove +1, spaces, etc.)
+            const cleanIdentifier = identifier.replace(/^\+?1?/, '').replace(/\D/g, '');
+            
+            // Find contact by phone number (cleaned)
+            const contact = this.contacts.find(c => {
+                if (!c.phone) return false;
+                const cleanPhone = c.phone.replace(/^\+?1?/, '').replace(/\D/g, '');
+                return cleanPhone === cleanIdentifier;
+            });
+            
+            // If not found by phone, try email
+            if (!contact) {
+                const contactByEmail = this.contacts.find(c => c.email === identifier);
+                if (contactByEmail) {
+                    return `${contactByEmail.firstName} ${contactByEmail.lastName} (${identifier})`;
+                }
+            }
+            
+            // If found by phone, return name with phone
+            if (contact) {
+                return `${contact.firstName} ${contact.lastName} (${identifier})`;
+            }
+            
+            // If not found, return original identifier
+            return identifier;
+        },
+        
+        getContactDetails(identifier) {
+            const contact = this.contacts.find(c => 
+                c.phone === identifier || c.email === identifier
+            );
+            if (contact) {
+                return `${contact.firstName} ${contact.lastName} (${identifier})`;
+            }
+            return identifier;
+        },
+        replyToMessage(message) {
+            if (message.type === 'inbound') {
+                this.messageType = 'sms';
+                this.selectedContacts = [];
+                
+                // Remove +1 or 1 from the start of the phone number
+                const phone = message.from.replace(/^\+?1?/, '').replace(/\D/g, '');
+                const contact = this.contacts.find(c => 
+                    c.phone.replace(/^\+?1?/, '').replace(/\D/g, '') === phone
+                );
+                
+                if (contact) {
+                    this.selectedContacts = [contact.id];
+                }
+                
+                const composeArea = document.querySelector('textarea');
+                if (composeArea) {
+                    composeArea.focus();
+                    composeArea.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        },
+        filterByCity() {
+            this.selectedContacts = [];  // Clear current selection
+            
+            // If cities are selected, select all contacts from those cities
+            if (this.cityFilter.length > 0) {
+                const cityContacts = this.contacts.filter(c => 
+                    this.cityFilter.includes(c.city) && 
+                    (this.messageType === 'email' ? c.email : c.phone) &&  // Ensure they have required contact info
+                    (this.contactFilter.length === 0 || (Array.isArray(c.categories) && c.categories.some(cat => this.contactFilter.includes(cat))))  // Respect category filter if set
+                );
+                this.selectedContacts = cityContacts;
+                this.isAllSelected = cityContacts.length > 0;
+            }
+        },
+        filterByCategory() {
+            this.selectedContacts = [];  // Clear current selection
+            
+            // If categories are selected, select all contacts from those categories
+            if (this.contactFilter.length > 0) {
+                const categoryContacts = this.contacts.filter(c => 
+                    (Array.isArray(c.categories) && c.categories.some(cat => this.contactFilter.includes(cat))) && 
+                    (this.messageType === 'email' ? c.email : c.phone) &&  // Ensure they have required contact info
+                    (this.cityFilter.length === 0 || this.cityFilter.includes(c.city))  // Respect city filter if set
+                );
+                this.selectedContacts = categoryContacts;
+                this.isAllSelected = categoryContacts.length > 0;
+            }
+        },
+        removeCategory(category) {
+            this.contactFilter = this.contactFilter.filter(c => c !== category);
+            this.updateFilteredContacts();
+        },
+        removeCity(city) {
+            this.cityFilter = this.cityFilter.filter(c => c !== city);
+            this.updateFilteredContacts();
+        },
+        clearAllFilters() {
+            this.contactFilter = [];
+            this.cityFilter = [];
+            this.contactSearch = '';
+            this.updateFilteredContacts();
+        },
+        toggleCategoryDropdown() {
+            this.showCategoryDropdown = !this.showCategoryDropdown;
+            if (this.showCategoryDropdown) {
+                this.showCityDropdown = false; // Close city dropdown when opening category
+            }
+        },
+        toggleCityDropdown() {
+            this.showCityDropdown = !this.showCityDropdown;
+            if (this.showCityDropdown) {
+                this.showCategoryDropdown = false; // Close category dropdown when opening city
+            }
+        },
+        updateFilteredContacts() {
+            // Force Vue to recompute filtered contacts
+            this.$nextTick(() => {
+                this.currentPage = 1;
+                this.selectAllContacts = false;
+                this.selectedContacts = [];
+            });
+        },
+        async loadVerifiedSenders() {
+            try {
+                const token = localStorage.getItem('token');
+                const headers = {};
+                if (token) headers['Authorization'] = 'Bearer ' + token;
+                const response = await fetch('/api/email/senders', {
+                    credentials: 'include',
+                    headers
+                });
+                if (response.ok) {
+                    const senders = await response.json();
+                    // Make sure we only get confirmed senders
+                    // Handle both Confirmed (capital C) and confirmed (lowercase) for backward compatibility
+                    this.verifiedSenders = senders.filter(sender => {
+                        const isConfirmed = sender.Confirmed === true || sender.confirmed === true;
+                        return isConfirmed && sender.EmailAddress; // Also ensure EmailAddress exists
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load verified senders:', error);
+            }
+        },
+        clearForm() {
+            this.message = { fromEmail: '', fromName: '', subject: '', content: '' };
+            this.selectedContacts = [];
+            this.selectedTemplate = null;
+            this.isAllSelected = false;
+            this.cityFilter = [];
+            this.contactFilter = [];
+            this.categoryFilter = '';
+            this.recipientSearch = '';
+            this.phoneSearch = '';
+            this.checkMessageLength();
+        },
+        handleSelectAll() {
+            if (this.selectAllContacts) {
+                // Only select contacts that match current filter and have required field
+                this.selectedContacts = this.filteredContacts.map(c => c.id);
+            } else {
+                this.selectedContacts = [];
+            }
+        },
+        loadMoreContacts() {
+            this.currentPage++;
+        },
+        
+        async refreshMessages() {
+            await this.loadUserData();
+            await this.loadMessages();
+            this.$forceUpdate();
+        },
+        clearContactSearch() {
+            this.contactSearchQuery = '';
+            this.contactSearchResults = [];
+            this.isSearching = false;
+        },
+        prevHistoryPage() {
+            if (this.historyPage > 1) this.historyPage--;
+        },
+        nextHistoryPage() {
+            if (this.historyPage < this.totalMessagePages) this.historyPage++;
+        },
+        
+        async searchContactStatus() {
+            if (!this.contactSearchQuery.trim()) {
+                alert('Please enter a contact name, email, or phone number to search');
+                return;
+            }
+            
+            this.isSearching = true;
+            this.contactSearchResults = [];
+            
+            try {
+                const response = await fetch(`/api/contacts/search-campaign-status?query=${encodeURIComponent(this.contactSearchQuery)}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const results = await response.json();
+                    this.contactSearchResults = results;
+                } else {
+                    console.error('Failed to search contact status');
+                }
+            } catch (error) {
+                console.error('Error searching contact status:', error);
+            } finally {
+                this.isSearching = false;
+            }
+        },
+        
+        clearMessageFilters() {
+            this.filterType = 'all';
+            this.historyPage = 1;
+        },
+        
+        getFilteredDirectionCount(direction) {
+            if (direction === 'sent') {
+                return this.filteredMessages.filter(m => m.type === 'outbound').length;
+            }
+            if (direction === 'received') {
+                return this.filteredMessages.filter(m => m.type === 'inbound').length;
+            }
+            return 0;
+        }
+    },
+    watch: {
+        messageType(newType) {
+            // Reset all filters when switching message type
+            this.cityFilter = [];
+            this.contactFilter = [];
+            this.categoryFilter = '';
+            this.recipientSearch = '';
+            this.phoneSearch = '';
+            this.selectedContacts = [];
+            this.isAllSelected = false;
+            
+            // Reset content when switching to SMS if it's too long
+            if (newType === 'sms' && this.message.content.length > 160) {
+                this.message.content = this.message.content.substring(0, 160);
+            }
+            this.checkMessageLength();
+            if (newType === 'sms') {
+                this.selectedTemplate = null;
+            }
+            if (newType === 'email') {
+                this.loadVerifiedSenders();
+            }
+        },
+        contactSearch() {
+            this.currentPage = 1;
+            this.selectAllContacts = false;
+            this.selectedContacts = [];
+        },
+        contactFilter: {
+            handler() {
+                this.currentPage = 1;
+                this.selectAllContacts = false;
+                this.selectedContacts = [];
+            },
+            deep: true
+        },
+        cityFilter: {
+            handler() {
+                this.currentPage = 1;
+                this.selectAllContacts = false;
+                this.selectedContacts = [];
+            },
+            deep: true
+        },
+        filterType() {
+            this.historyPage = 1;
+        }
+    },
+    async created() {
+        // Server already authenticated this page (cookie); don't redirect on missing localStorage token.
+        try {
+            const token = localStorage.getItem('token');
+            const headers = {};
+            if (token) headers['Authorization'] = 'Bearer ' + token;
+            const response = await fetch('/api/user', {
+                credentials: 'include',
+                headers
+            });
+
+            if (response.status === 401) {
+                if (window.redirectToLogin) window.redirectToLogin('no_token', { from: 'messages' });
+                else window.location.replace('/login?loop=1&reason=no_token&from=messages');
+                return;
+            }
+            if (!response.ok) {
+                throw new Error('Not authenticated');
+            }
+
+            this.user = await response.json();
+            this.contacts = this.user.contacts;
+            this.tokenBalance = this.user.tokenBalance;
+            await this.loadTemplates();
+            await this.loadUserData();
+            await this.loadMessages(); // Load messages after user data to ensure proper types
+            if (this.messageType === 'email') {
+                await this.loadVerifiedSenders();
+            }
+
+            // Force a reactive update
+            this.$nextTick(() => {
+                this.$forceUpdate();
+            });
+        } catch (error) {
+            if (window.redirectToLogin) window.redirectToLogin('error', { from: 'messages' });
+            else window.location.replace('/login?loop=1&reason=error&from=messages');
+        }
+    },
+    mounted() {
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', (e) => {
+            // Check if click is inside category or city dropdown containers
+            const clickedInsideCategoryDropdown = this.$refs.categoryDropdownContainer && 
+                                                   this.$refs.categoryDropdownContainer.contains(e.target);
+            const clickedInsideCityDropdown = this.$refs.cityDropdownContainer && 
+                                               this.$refs.cityDropdownContainer.contains(e.target);
+            
+            // If clicked outside both dropdown containers, close them
+            if (!clickedInsideCategoryDropdown && !clickedInsideCityDropdown) {
+                this.showCategoryDropdown = false;
+                this.showCityDropdown = false;
+            }
+        });
+    }
+}).mount('#app')
+</script> 

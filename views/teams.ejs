@@ -1,0 +1,679 @@
+<%- include('partials/nav') %>
+
+<%
+const isAccountHolder = (typeof user !== 'undefined' && user && (user.userType === 'account_holder' || user.userType === 'app_owner'));
+const permissionKeys = [
+  'VIEW_DASHBOARD',
+  'VIEW_CONTACT_MANAGER',
+  'VIEW_ELECTION_LISTS',
+  'VIEW_ELECTION_INTERACTIONS',
+  'VIEW_ELECTION_NAVIGATION',
+  'VIEW_ELECTION_SCRUTINEERING',
+  'VIEW_INVOICES',
+  'VIEW_MESSAGES',
+  'VIEW_IMAGE_LIBRARY',
+  'VIEW_AI_CALLING',
+  'VIEW_TEMPLATES',
+  'VIEW_TEAMS'
+];
+const permissionLabels = {
+  VIEW_DASHBOARD: 'Dashboard',
+  VIEW_CONTACT_MANAGER: 'Contact Manager',
+  VIEW_ELECTION_LISTS: 'Election Lists',
+  VIEW_ELECTION_INTERACTIONS: 'Election Interactions',
+  VIEW_ELECTION_NAVIGATION: 'Election Navigation',
+  VIEW_ELECTION_SCRUTINEERING: 'Election Scrutineering',
+  VIEW_INVOICES: 'Invoices',
+  VIEW_MESSAGES: 'Messages',
+  VIEW_IMAGE_LIBRARY: 'Image Library',
+  VIEW_AI_CALLING: 'AI Calling',
+  VIEW_TEMPLATES: 'Templates',
+  VIEW_TEAMS: 'Teams (manager only)'
+};
+%>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" id="teams-app">
+  <!-- Page header -->
+  <div class="mb-6 sm:mb-8">
+    <h1 class="text-2xl sm:text-3xl font-bold text-gray-900">Teams &amp; Permissions</h1>
+    <p class="mt-1 text-sm text-gray-500">Invite team members, assign roles, set view permissions, and manage list assignments. Election Mode only.</p>
+  </div>
+
+  <!-- Invite / Add Member Panel (B) -->
+  <div class="bg-white shadow rounded-lg border border-gray-200 overflow-hidden mb-6 sm:mb-8">
+    <div class="px-4 py-4 sm:px-6 border-b border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900">Invite team member</h2>
+      <p class="mt-0.5 text-sm text-gray-500">Send an invite by email and assign a role.</p>
+    </div>
+    <div class="p-4 sm:p-6">
+      <form @submit.prevent="sendInvite" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+        <div>
+          <label for="invite-email" class="block text-sm font-medium text-gray-700 mb-1">Email <span class="text-red-500">*</span></label>
+          <input id="invite-email" v-model="inviteForm.email" type="email" required
+                 class="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                 placeholder="volunteer@example.com">
+        </div>
+        <div>
+          <label for="invite-name" class="block text-sm font-medium text-gray-700 mb-1">Name (optional)</label>
+          <input id="invite-name" v-model="inviteForm.name" type="text"
+                 class="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                 placeholder="Full name">
+        </div>
+        <div>
+          <label for="invite-role" class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+          <select id="invite-role" v-model="inviteForm.roleId" required
+                  class="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">Select role</option>
+            <option v-for="r in roles" :key="r.roleId" :value="r.roleId">{{ r.roleName }}</option>
+          </select>
+        </div>
+        <div class="flex flex-wrap gap-2 sm:block">
+          <button type="submit" :disabled="inviteSending"
+                  class="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+            <span v-if="inviteSending">Sending…</span>
+            <span v-else>Send invite</span>
+          </button>
+        </div>
+      </form>
+      <p v-if="inviteError" class="mt-2 text-sm text-red-600">{{ inviteError }}</p>
+      <p v-if="inviteSuccess" class="mt-2 text-sm text-green-600">{{ inviteSuccess }}</p>
+    </div>
+  </div>
+
+  <!-- Team Members Table (A) -->
+  <div class="bg-white shadow rounded-lg border border-gray-200 overflow-hidden mb-6 sm:mb-8">
+    <div class="px-4 py-4 sm:px-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <h2 class="text-lg font-semibold text-gray-900">Team members</h2>
+      <span v-if="members.length > 0" class="text-sm text-gray-500">{{ members.length }} member(s)</span>
+    </div>
+    <div class="overflow-x-auto">
+      <!-- Desktop table -->
+      <table class="min-w-full divide-y divide-gray-200 hidden sm:table">
+        <thead class="bg-gray-50">
+          <tr>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned lists</th>
+            <th scope="col" class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="bg-white divide-y divide-gray-200">
+          <tr v-if="members.length === 0">
+            <td colspan="6" class="px-4 py-8 text-center text-sm text-gray-500">No team members yet. Send an invite above.</td>
+          </tr>
+          <tr v-for="m in members" :key="m.memberId" class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{{ m.name || '—' }}</td>
+            <td class="px-4 py-3 text-sm text-gray-600">{{ m.email }}</td>
+            <td class="px-4 py-3">
+              <select :value="m.roleId" @change="onRoleChange(m, $event.target.value)"
+                      class="border border-gray-300 rounded px-2 py-1 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+                <option v-for="r in roles" :key="r.roleId" :value="r.roleId">{{ r.roleName }}</option>
+              </select>
+            </td>
+            <td class="px-4 py-3">
+              <span :class="statusClass(m.status)" class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full">
+                {{ m.status }}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-sm text-gray-600">
+              <span>{{ (m.assignedListIds && m.assignedListIds.length) || 0 }} list(s)</span>
+              <button type="button" @click="openAssignments(m)"
+                      class="ml-2 text-indigo-600 hover:text-indigo-800 text-sm font-medium">Manage</button>
+            </td>
+            <td class="px-4 py-3 text-right space-x-2">
+              <button type="button" @click="openPermissions(m)"
+                      class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">Permissions</button>
+              <button v-if="m.status === 'suspended'" type="button" @click="setSuspended(m, false)"
+                      class="text-green-600 hover:text-green-800 text-sm font-medium">Unsuspend</button>
+              <button v-else type="button" @click="setSuspended(m, true)"
+                      class="text-amber-600 hover:text-amber-800 text-sm font-medium">Suspend</button>
+              <button type="button" @click="removeMember(m)"
+                      class="text-red-600 hover:text-red-800 text-sm font-medium">Remove</button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- Mobile cards -->
+      <div class="sm:hidden divide-y divide-gray-200">
+        <div v-if="members.length === 0" class="px-4 py-8 text-center text-sm text-gray-500">No team members yet. Send an invite above.</div>
+        <div v-for="m in members" :key="m.memberId" class="p-4">
+          <div class="flex flex-col gap-2">
+            <div class="font-medium text-gray-900">{{ m.name || '—' }}</div>
+            <div class="text-sm text-gray-600">{{ m.email }}</div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <select :value="m.roleId" @change="onRoleChange(m, $event.target.value)"
+                      class="border border-gray-300 rounded px-2 py-1 text-sm flex-1 min-w-0 max-w-[180px]">
+                <option v-for="r in roles" :key="r.roleId" :value="r.roleId">{{ r.roleName }}</option>
+              </select>
+              <span :class="statusClass(m.status)" class="inline-flex px-2 py-0.5 text-xs font-medium rounded-full">{{ m.status }}</span>
+            </div>
+            <div class="text-sm text-gray-600">
+              {{ (m.assignedListIds && m.assignedListIds.length) || 0 }} list(s)
+              <button type="button" @click="openAssignments(m)" class="text-indigo-600 hover:text-indigo-800 font-medium ml-1">Manage</button>
+            </div>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <button type="button" @click="openPermissions(m)"
+                      class="px-3 py-1.5 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100">Permissions</button>
+              <button v-if="m.status === 'suspended'" type="button" @click="setSuspended(m, false)"
+                      class="px-3 py-1.5 text-sm font-medium text-green-600 bg-green-50 rounded-md hover:bg-green-100">Unsuspend</button>
+              <button v-else type="button" @click="setSuspended(m, true)"
+                      class="px-3 py-1.5 text-sm font-medium text-amber-600 bg-amber-50 rounded-md hover:bg-amber-100">Suspend</button>
+              <button type="button" @click="removeMember(m)"
+                      class="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Roles Panel (E) - Account Holder only -->
+  <% if (isAccountHolder) { %>
+  <div class="bg-white shadow rounded-lg border border-gray-200 overflow-hidden mb-6 sm:mb-8">
+    <div class="px-4 py-4 sm:px-6 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+      <div>
+        <h2 class="text-lg font-semibold text-gray-900">Custom roles</h2>
+        <p class="mt-0.5 text-sm text-gray-500">Create and edit role templates (Account Holder only).</p>
+      </div>
+      <button type="button" @click="showNewRoleForm = !showNewRoleForm"
+              class="inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+        {{ showNewRoleForm ? 'Cancel' : 'Create role' }}
+      </button>
+    </div>
+    <div class="p-4 sm:p-6">
+      <div v-if="showNewRoleForm" class="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+        <h3 class="text-base font-medium text-gray-900 mb-3">New custom role</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label for="new-role-name" class="block text-sm font-medium text-gray-700 mb-1">Role name</label>
+            <input id="new-role-name" v-model="newRoleForm.roleName" type="text"
+                   class="w-full border border-gray-300 rounded-md shadow-sm px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                   placeholder="e.g. Data Entry">
+          </div>
+        </div>
+        <div class="mb-4">
+          <p class="text-sm font-medium text-gray-700 mb-2">Default permissions</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+            <label v-for="key in permissionKeys" :key="key" class="inline-flex items-center gap-2">
+              <input type="checkbox" :checked="!!newRoleForm.defaultPermissions[key]" @change="toggleNewRolePerm(key, $event.target.checked)"
+                     class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+              <span class="text-sm text-gray-700">{{ permissionLabels[key] }}</span>
+            </label>
+          </div>
+        </div>
+        <button type="button" @click="createCustomRole"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+          Create role
+        </button>
+      </div>
+      <div class="space-y-2">
+        <p v-if="customRoles.length === 0" class="text-sm text-gray-500">No custom roles. Built-in roles cannot be edited here.</p>
+        <div v-for="r in customRoles" :key="r.roleId" class="flex flex-wrap items-center justify-between gap-2 p-3 border border-gray-200 rounded-lg">
+          <span class="font-medium text-gray-900">{{ r.roleName }}</span>
+          <div class="flex gap-2">
+            <button type="button" @click="openEditRole(r)" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">Edit</button>
+            <button type="button" @click="deleteCustomRole(r)" class="text-sm text-red-600 hover:text-red-800 font-medium">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <% } %>
+
+  <!-- Permissions Editor Modal (C) -->
+  <div v-if="permissionsMember" role="dialog" aria-modal="true" aria-labelledby="permissions-modal-title"
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50"
+       @click.self="closePermissions">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+         @click.stop>
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 id="permissions-modal-title" class="text-lg font-semibold text-gray-900">Permissions: {{ permissionsMember.name || permissionsMember.email }}</h2>
+        <p class="mt-0.5 text-sm text-gray-500">Manager can override any permission. Deny by default unless enabled.</p>
+      </div>
+      <div class="px-6 py-4 space-y-3">
+        <label v-for="key in permissionKeys" :key="key" class="flex items-center justify-between gap-4 py-2 border-b border-gray-100 last:border-0">
+          <span class="text-sm text-gray-700">{{ permissionLabels[key] }}</span>
+          <input type="checkbox" :checked="!!permissionsEdit[key]" @change="permissionsEdit[key] = $event.target.checked"
+                 :disabled="key === 'VIEW_TEAMS' && !isAccountHolder"
+                 :title="key === 'VIEW_TEAMS' && !isAccountHolder ? 'Only Campaign Manager / Account Holder can grant Teams access' : ''"
+                 class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-50">
+        </label>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200 flex flex-wrap gap-2">
+        <button type="button" @click="savePermissions"
+                class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700">
+          Save
+        </button>
+        <button type="button" @click="resetPermissionsToRole"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50">
+          Reset to role defaults
+        </button>
+        <button type="button" @click="closePermissions"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 rounded-md">
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assignments Editor Modal (D) -->
+  <div v-if="assignmentsMember" role="dialog" aria-modal="true" aria-labelledby="assignments-modal-title"
+       class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50"
+       @click.self="closeAssignments">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+         @click.stop>
+      <div class="px-6 py-4 border-b border-gray-200">
+        <h2 id="assignments-modal-title" class="text-lg font-semibold text-gray-900">List assignments: {{ assignmentsMember.name || assignmentsMember.email }}</h2>
+        <p class="mt-0.5 text-sm text-gray-500">Assign election lists to this volunteer. They will only see assigned lists in Election Lists view.</p>
+      </div>
+      <div class="px-6 py-4">
+        <div class="flex flex-col sm:flex-row gap-2 mb-4">
+          <select v-model="newAssignmentListId" class="flex-1 border border-gray-300 rounded-md shadow-sm px-3 py-2 text-sm focus:ring-indigo-500 focus:border-indigo-500">
+            <option value="">Select a list to assign</option>
+            <option v-for="list in lists" :key="list.id" :value="list.id">{{ list.name || list.id }}</option>
+          </select>
+          <button type="button" @click="addAssignment" :disabled="!newAssignmentListId || assignmentSaving"
+                  class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+            Assign list
+          </button>
+        </div>
+        <div class="border border-gray-200 rounded-lg overflow-hidden">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">List</th>
+                <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned</th>
+                <th scope="col" class="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+              <tr v-if="memberAssignments.length === 0">
+                <td colspan="4" class="px-4 py-6 text-center text-sm text-gray-500">No list assignments yet.</td>
+              </tr>
+              <tr v-for="a in memberAssignments" :key="a.assignmentId">
+                <td class="px-4 py-2 text-sm font-medium text-gray-900">{{ listNameById(a.listId) }}</td>
+                <td class="px-4 py-2">
+                  <select :value="a.status" @change="updateAssignmentStatus(a, $event.target.value)"
+                          class="border border-gray-300 rounded px-2 py-1 text-xs focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="assigned">Assigned</option>
+                    <option value="in_progress">In progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                </td>
+                <td class="px-4 py-2 text-sm text-gray-500">{{ formatDate(a.assignedAt) }}</td>
+                <td class="px-4 py-2 text-right">
+                  <button type="button" @click="removeAssignment(a)" class="text-red-600 hover:text-red-800 text-sm font-medium">Unassign</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="px-6 py-4 border-t border-gray-200">
+        <button type="button" @click="closeAssignments"
+                class="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Loading / error state -->
+  <div v-if="loadError" class="rounded-lg bg-red-50 border border-red-200 p-4 text-sm text-red-700">
+    {{ loadError }}
+  </div>
+  <div v-if="loading" class="text-center py-8 text-gray-500 text-sm">Loading teams data…</div>
+</div>
+
+<script>
+(function() {
+  const permissionKeys = <%- JSON.stringify(permissionKeys) %>;
+  const permissionLabels = <%- JSON.stringify(permissionLabels) %>;
+  const isAccountHolder = <%= isAccountHolder ? 'true' : 'false' %>;
+
+  const { createApp } = Vue;
+
+  createApp({
+    data() {
+      return {
+        members: [],
+        roles: [],
+        permissionKeys: permissionKeys,
+        permissionLabels: permissionLabels,
+        lists: [],
+        loading: true,
+        loadError: null,
+        inviteForm: { email: '', name: '', roleId: '' },
+        inviteSending: false,
+        inviteError: null,
+        inviteSuccess: null,
+        inviteEmailSent: true,
+        permissionsMember: null,
+        permissionsEdit: {},
+        assignmentsMember: null,
+        memberAssignments: [],
+        newAssignmentListId: '',
+        assignmentSaving: false,
+        showNewRoleForm: false,
+        newRoleForm: { roleName: '', defaultPermissions: {} },
+        editingRole: null,
+        editRoleForm: { roleName: '', defaultPermissions: {} },
+        isAccountHolder: isAccountHolder
+      };
+    },
+    computed: {
+      customRoles() {
+        return (this.roles || []).filter(r => !r.isSystem);
+      }
+    },
+    mounted() {
+      this.fetchTeamsData();
+    },
+    methods: {
+      statusClass(status) {
+        const s = (status || '').toLowerCase();
+        if (s === 'active') return 'bg-green-100 text-green-800';
+        if (s === 'invited') return 'bg-blue-100 text-blue-800';
+        if (s === 'suspended') return 'bg-red-100 text-red-800';
+        return 'bg-gray-100 text-gray-800';
+      },
+      async fetchTeamsData() {
+        this.loading = true;
+        this.loadError = null;
+        try {
+          const res = await fetch('/election/teams/data', { credentials: 'include' });
+          if (!res.ok) {
+            this.loadError = 'Could not load teams data. Ensure you have Teams access and Election Mode is active.';
+            this.members = [];
+            this.roles = this.getBuiltInRoles();
+            this.lists = [];
+            return;
+          }
+          const data = await res.json();
+          this.members = data.members || [];
+          this.roles = data.roles && data.roles.length ? data.roles : this.getBuiltInRoles();
+          this.lists = data.lists || [];
+        } catch (e) {
+          this.loadError = 'Network error loading teams.';
+          this.members = [];
+          this.roles = this.getBuiltInRoles();
+          this.lists = [];
+        } finally {
+          this.loading = false;
+        }
+      },
+      getBuiltInRoles() {
+        return [
+          { roleId: 'campaign_manager', roleName: 'Campaign Manager', isSystem: true },
+          { roleId: 'phone_caller', roleName: 'Phone Caller', isSystem: true },
+          { roleId: 'canvasser', roleName: 'Canvasser (Door Knocker)', isSystem: true },
+          { roleId: 'scrutineer', roleName: 'Scrutineer', isSystem: true },
+          { roleId: 'marketing', roleName: 'Marketing', isSystem: true },
+          { roleId: 'driver', roleName: 'Driver', isSystem: true },
+          { roleId: 'lawn_signs', roleName: 'Lawn Signs', isSystem: true },
+          { roleId: 'volunteer_general', roleName: 'Volunteer (General)', isSystem: true },
+          { roleId: 'custom', roleName: 'Custom', isSystem: true }
+        ];
+      },
+      async sendInvite() {
+        this.inviteError = null;
+        this.inviteSuccess = null;
+        this.inviteSending = true;
+        try {
+          const res = await fetch('/election/teams/invite', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: this.inviteForm.email,
+              name: this.inviteForm.name || undefined,
+              roleId: this.inviteForm.roleId
+            })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            this.inviteError = data.message || data.error || 'Invite failed.';
+            return;
+          }
+          this.inviteSuccess = data.message || ('Invite sent to ' + this.inviteForm.email);
+          this.inviteEmailSent = data.emailSent !== false;
+          this.inviteForm = { email: '', name: '', roleId: this.inviteForm.roleId };
+          this.inviteSending = false;
+          this.fetchTeamsData();
+        } catch (e) {
+          this.inviteError = e.message || 'Request failed.';
+          this.inviteSending = false;
+        }
+      },
+      async onRoleChange(member, roleId) {
+        if (!confirm('Apply role defaults and overwrite current permission toggles? Choose Cancel to keep existing permissions.')) return;
+        try {
+          const res = await fetch('/election/teams/member/update-role', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId: member.memberId, roleId })
+          });
+          if (res.ok) await this.fetchTeamsData();
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      openPermissions(m) {
+        this.permissionsMember = m;
+        this.permissionsEdit = { ...(m.permissions || {}) };
+        permissionKeys.forEach(k => {
+          if (this.permissionsEdit[k] === undefined) this.permissionsEdit[k] = false;
+        });
+      },
+      closePermissions() {
+        this.permissionsMember = null;
+      },
+      async savePermissions() {
+        if (!this.permissionsMember) return;
+        try {
+          const res = await fetch('/election/teams/member/update-permissions', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId: this.permissionsMember.memberId, permissionsPatch: this.permissionsEdit })
+          });
+          if (res.ok) {
+            await this.fetchTeamsData();
+            this.closePermissions();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      async resetPermissionsToRole() {
+        if (!this.permissionsMember) return;
+        const role = this.roles.find(r => r.roleId === this.permissionsMember.roleId);
+        if (role && role.defaultPermissions) {
+          this.permissionsEdit = { ...role.defaultPermissions };
+          permissionKeys.forEach(k => {
+            if (this.permissionsEdit[k] === undefined) this.permissionsEdit[k] = false;
+          });
+        }
+      },
+      async setSuspended(member, suspended) {
+        try {
+          const res = await fetch('/election/teams/member/suspend', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId: member.memberId, suspended })
+          });
+          if (res.ok) await this.fetchTeamsData();
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      async removeMember(member) {
+        if (!confirm('Remove this member from the team? This cannot be undone.')) return;
+        try {
+          const res = await fetch('/election/teams/member/remove', {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId: member.memberId })
+          });
+          if (res.ok) await this.fetchTeamsData();
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      async openAssignments(m) {
+        this.assignmentsMember = m;
+        this.newAssignmentListId = '';
+        this.memberAssignments = [];
+        try {
+          const res = await fetch('/election/assignments?memberId=' + encodeURIComponent(m.memberId), { credentials: 'include' });
+          if (res.ok) {
+            const data = await res.json();
+            this.memberAssignments = Array.isArray(data) ? data : (data.assignments || []);
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      closeAssignments() {
+        this.assignmentsMember = null;
+        this.memberAssignments = [];
+      },
+      listNameById(id) {
+        const list = this.lists.find(l => l.id === id);
+        return list ? (list.name || id) : id;
+      },
+      formatDate(val) {
+        if (!val) return '—';
+        const d = new Date(val);
+        return isNaN(d.getTime()) ? val : d.toLocaleDateString();
+      },
+      async addAssignment() {
+        if (!this.newAssignmentListId || !this.assignmentsMember) return;
+        this.assignmentSaving = true;
+        try {
+          const res = await fetch('/election/assignments/create', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ memberId: this.assignmentsMember.memberId, listId: this.newAssignmentListId })
+          });
+          if (res.ok) {
+            this.newAssignmentListId = '';
+            await this.openAssignments(this.assignmentsMember);
+            await this.fetchTeamsData();
+          }
+        } finally {
+          this.assignmentSaving = false;
+        }
+      },
+      async updateAssignmentStatus(a, status) {
+        try {
+          await fetch('/election/assignments/update-status', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignmentId: a.assignmentId, status })
+          });
+          await this.openAssignments(this.assignmentsMember);
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      async removeAssignment(a) {
+        if (!confirm('Unassign this list from the volunteer?')) return;
+        try {
+          await fetch('/election/assignments/remove', {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assignmentId: a.assignmentId })
+          });
+          await this.openAssignments(this.assignmentsMember);
+          await this.fetchTeamsData();
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      toggleNewRolePerm(key, checked) {
+        this.newRoleForm.defaultPermissions = { ...this.newRoleForm.defaultPermissions, [key]: checked };
+      },
+      async createCustomRole() {
+        if (!this.newRoleForm.roleName.trim()) return;
+        try {
+          const res = await fetch('/election/roles/create', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roleName: this.newRoleForm.roleName.trim(),
+              defaultPermissions: this.newRoleForm.defaultPermissions
+            })
+          });
+          if (res.ok) {
+            this.showNewRoleForm = false;
+            this.newRoleForm = { roleName: '', defaultPermissions: {} };
+            await this.fetchTeamsData();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      openEditRole(role) {
+        this.editingRole = role;
+        this.editRoleForm = {
+          roleName: role.roleName || '',
+          defaultPermissions: { ...(role.defaultPermissions || {}) }
+        };
+        permissionKeys.forEach(k => {
+          if (this.editRoleForm.defaultPermissions[k] === undefined) this.editRoleForm.defaultPermissions[k] = false;
+        });
+      },
+      toggleEditRolePerm(key, checked) {
+        this.editRoleForm.defaultPermissions = { ...this.editRoleForm.defaultPermissions, [key]: checked };
+      },
+      async saveEditRole() {
+        if (!this.editingRole) return;
+        try {
+          const res = await fetch('/election/roles/update', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              roleId: this.editingRole.roleId,
+              roleName: this.editRoleForm.roleName.trim() || this.editingRole.roleName,
+              defaultPermissions: this.editRoleForm.defaultPermissions
+            })
+          });
+          if (res.ok) {
+            this.editingRole = null;
+            await this.fetchTeamsData();
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      },
+      async deleteCustomRole(role) {
+        if (!confirm('Delete this role? Members using it may need to be reassigned.')) return;
+        try {
+          const res = await fetch('/election/roles/delete', {
+            method: 'DELETE',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ roleId: role.roleId })
+          });
+          if (res.ok) await this.fetchTeamsData();
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }).mount('#teams-app');
+})();
+</script>

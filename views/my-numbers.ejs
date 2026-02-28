@@ -1,0 +1,1194 @@
+<%- include('partials/nav') %>
+<script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <div class="py-6 space-y-6">
+        <!-- Phone Numbers Section -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Phone Numbers</h2>
+            
+            <!-- Search Numbers -->
+            <div class="mb-8">
+                <h3 class="text-lg font-medium mb-4">Search Available Numbers</h3>
+                <div class="flex space-x-4">
+                    <input v-model="areaCode" 
+                           type="text" 
+                           class="border rounded-md px-3 py-2 w-32"
+                           placeholder="Area Code"
+                           maxlength="3"
+                           @keypress="onlyNumbers">
+                    <button @click="searchNumbers" 
+                            :disabled="!areaCode || searching"
+                            class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50">
+                        {{ searching ? 'Searching...' : 'Search' }}
+                    </button>
+                </div>
+
+                <!-- Search Results -->
+                <div v-if="availableNumbers.length" class="mt-4">
+                    <div class="bg-gray-50 rounded-lg p-4">
+                        <h4 class="font-medium mb-4">Available Numbers:</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div v-for="number in availableNumbers" 
+                                 :key="number.phoneNumber"
+                                 class="border rounded-lg p-4 bg-white">
+                                <div class="font-medium">{{ number.phoneNumber }}</div>
+                                <div class="text-sm text-gray-600">{{ number.locality }}, {{ number.region }}</div>
+                                <div class="text-sm text-gray-600 mb-3">${{ number.monthlyPrice }}/month</div>
+                                <button @click="openPaymentModal(number.phoneNumber)"
+                                        :disabled="purchasing"
+                                        class="bg-green-500 text-white px-3 py-1 rounded text-sm hover:bg-green-600 disabled:opacity-50">
+                                    {{ purchasing ? 'Processing...' : 'Purchase' }}
+                                </button>
+                                <div class="flex items-center space-x-1 text-sm text-gray-500 mt-1">
+                                    <svg class="text-green-500" style="width: 14px; height: 14px;" fill="currentColor" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span class="text-sm">Secure</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- My Numbers -->
+            <div>
+                <h3 class="text-lg font-medium mb-4">My Numbers</h3>
+                <div v-if="myNumbers.length" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div v-for="number in myNumbers" 
+                         :key="number.id"
+                         class="border rounded-lg p-4">
+                        <div class="font-medium">{{ number.number }}</div>
+                        <div class="text-sm text-gray-600">Purchased: {{ new Date(number.purchasedAt).toLocaleDateString() }}</div>
+                        <div class="text-sm text-gray-600">${{ number.monthlyPrice }}/month</div>
+                        <div class="mt-2">
+                            <span v-if="number.isDefault" class="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                                Default Number
+                            </span>
+                        </div>
+                        <button v-if="!number.isDefault"
+                                @click="setDefaultNumber(number.number)"
+                                class="mt-2 text-sm text-indigo-600 hover:text-indigo-800">
+                            Set as Default
+                        </button>
+                    </div>
+                </div>
+                <div v-else class="text-gray-500 text-center py-8">
+                    You don't have any phone numbers yet
+                </div>
+            </div>
+        </div>
+
+        <!-- SMTP Configuration Section -->
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">SMTP Server Configuration</h2>
+            <p class="text-gray-600 mb-6">
+                Configure your own SMTP server for sending emails. If not configured, the system will use the default SMTP server.
+            </p>
+
+            <!-- Current SMTP Status -->
+            <div v-if="smtpSettings" class="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <p class="font-medium text-gray-900">
+                            {{ smtpSettings.isGlobal ? 'Using Global SMTP' : 'Using Custom SMTP' }}
+                        </p>
+                        <p v-if="!smtpSettings.isGlobal" class="text-sm text-gray-600">
+                            {{ smtpSettings.host }}:{{ smtpSettings.port }}
+                        </p>
+                    </div>
+                    <span :class="{
+                        'px-3 py-1 rounded-full text-sm': true,
+                        'bg-green-100 text-green-800': !smtpSettings.isGlobal,
+                        'bg-blue-100 text-blue-800': smtpSettings.isGlobal
+                    }">
+                        {{ smtpSettings.isGlobal ? 'Default' : 'Custom' }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- SMTP Settings Form -->
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">SMTP Host</label>
+                    <input v-model="smtpForm.host" 
+                           type="text" 
+                           class="w-full border rounded-md px-3 py-2"
+                           placeholder="smtp.gmail.com">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Port</label>
+                        <input v-model="smtpForm.port" 
+                               type="number" 
+                               class="w-full border rounded-md px-3 py-2"
+                               placeholder="587">
+                        <p class="text-xs text-gray-500 mt-1">Common: 587 (TLS), 465 (SSL)</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Security</label>
+                        <select v-model="smtpForm.secure" class="w-full border rounded-md px-3 py-2">
+                            <option value="none">None (No Encryption)</option>
+                            <option :value="false">STARTTLS (Port 587)</option>
+                            <option :value="true">SSL/TLS (Port 465)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input v-model="smtpForm.user" 
+                           type="text" 
+                           class="w-full border rounded-md px-3 py-2"
+                           placeholder="your-email@example.com">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input v-model="smtpForm.pass" 
+                           type="password" 
+                           class="w-full border rounded-md px-3 py-2"
+                           placeholder="Enter SMTP password">
+                    <p class="text-xs text-gray-500 mt-1">
+                        For Gmail, use an App Password. Password is stored securely.
+                    </p>
+                </div>
+
+                <!-- Helper message for disabled buttons -->
+                <div v-if="!canTestSMTP" class="p-3 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p class="text-sm text-yellow-800">
+                        <strong>💡 Tip:</strong> Fill in all SMTP fields above to enable the Test Connection and Save buttons.
+                    </p>
+                </div>
+
+                <div class="space-y-3 sm:space-y-0 sm:flex sm:space-x-3">
+                    <button @click="testSMTPConnection" 
+                            :disabled="testingSMTP || !canTestSMTP"
+                            class="w-full sm:w-auto bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            :title="!canTestSMTP ? 'Fill in all SMTP fields to enable' : 'Test SMTP connection'">
+                        {{ testingSMTP ? 'Testing...' : 'Test Connection' }}
+                    </button>
+                    <button @click="saveSMTPSettings" 
+                            :disabled="savingSMTP || !canSaveSMTP"
+                            class="w-full sm:w-auto bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            :title="!canSaveSMTP ? 'Fill in all SMTP fields to enable' : 'Save SMTP settings'">
+                        {{ savingSMTP ? 'Saving...' : 'Save Settings' }}
+                    </button>
+                    <button v-if="smtpSettings && !smtpSettings.isGlobal"
+                            @click="deleteSMTPSettings" 
+                            :disabled="deletingSMTP"
+                            class="w-full sm:w-auto bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                            title="Remove custom SMTP settings">
+                        {{ deletingSMTP ? 'Removing...' : 'Remove Custom Settings' }}
+                    </button>
+                </div>
+
+                <!-- Test Result Message -->
+                <div v-if="smtpTestResult" 
+                     :class="{
+                         'p-4 rounded-lg': true,
+                         'bg-green-50 text-green-800': smtpTestResult.success,
+                         'bg-red-50 text-red-800': !smtpTestResult.success
+                     }">
+                    <div class="flex items-center">
+                        <svg v-if="smtpTestResult.success" class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                        <svg v-else class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>{{ smtpTestResult.message }}</span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Email Settings Section -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Email Sender Settings</h2>
+            <p class="text-gray-600 mb-6">
+                Add and verify sender email addresses for your campaigns.
+            </p>
+            
+            <!-- Add New Sender -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Add Sending Email</label>
+                <div class="flex space-x-2">
+                    <input v-model="newSenderEmail" 
+                           type="email" 
+                           class="flex-1 border rounded-md px-3 py-2"
+                           placeholder="your@domain.com">
+                    <button @click="addSenderEmail" 
+                            :disabled="isAddingSender"
+                            class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50">
+                        {{ isAddingSender ? 'Adding...' : 'Add' }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- Sender List -->
+            <div v-if="senderEmails.length">
+                <h3 class="text-lg font-medium mb-4">Your Sender Emails</h3>
+                <div class="space-y-4">
+                    <div v-for="sender in senderEmails" 
+                         :key="sender.ID" 
+                         class="border rounded-lg p-4">
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                            <p class="font-medium break-words sm:break-normal">{{ sender.EmailAddress }}</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span :class="{
+                                    'px-2 py-1 text-xs rounded-full flex items-center': true,
+                                    'bg-green-100 text-green-800': sender.emailConfirmed,
+                                    'bg-yellow-100 text-yellow-800': !sender.emailConfirmed
+                                }">
+                                    <svg v-if="sender.emailConfirmed" class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    Email Confirmation
+                                </span>
+                                <span :class="{
+                                    'px-2 py-1 text-xs rounded-full flex items-center': true,
+                                    'bg-green-100 text-green-800': isAllRecordsVerified(sender),
+                                    'bg-yellow-100 text-yellow-800': !isAllRecordsVerified(sender)
+                                }">
+                                    <svg v-if="isAllRecordsVerified(sender)" class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    DNS Records
+                                </span>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                <button @click="checkEmailConfirmation(sender.id)"
+                                        class="w-full sm:w-auto text-indigo-600 hover:text-indigo-800 text-sm">
+                                    Check Email Status
+                                </button>
+                                <button @click="checkVerification(sender.id)"
+                                        class="w-full sm:w-auto text-indigo-600 hover:text-indigo-800 text-sm">
+                                    Check DNS Records
+                                </button>
+                                <button v-if="!sender.Confirmed && isReadyToActivate(sender)"
+                                        @click="activateSender(sender.id)"
+                                        class="w-full sm:w-auto text-green-600 hover:text-green-800 text-sm font-medium">
+                                    Activate
+                                </button>
+                                <button v-if="sender.Confirmed"
+                                        @click="deactivateSender(sender.id)"
+                                        class="w-full sm:w-auto text-orange-600 hover:text-orange-800 text-sm font-medium">
+                                    Deactivate
+                                </button>
+                                <button @click="deleteSender(sender.id)"
+                                        class="w-full sm:w-auto text-red-600 hover:text-red-800 text-sm">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Verification Steps Section -->
+                        <div class="mt-4">
+                            <button @click="sender.showSteps = !sender.showSteps" 
+                                    class="flex items-center text-gray-700 mb-2">
+                                <svg :class="{'transform rotate-180': sender.showSteps}"
+                                     class="w-5 h-5 transition-transform duration-200" 
+                                     fill="none" 
+                                     stroke="currentColor" 
+                                     viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" 
+                                          stroke-linejoin="round" 
+                                          stroke-width="2" 
+                                          d="M19 9l-7 7-7-7" />
+                                </svg>
+                                <span class="ml-2">Verification Steps</span>
+                            </button>
+
+                            <div v-show="sender.showSteps" class="bg-gray-50 p-4 rounded text-sm">
+                                <div class="space-y-4" v-if="sender.verificationDetails">
+                                    <!-- SPF Record -->
+                                    <div>
+                                        <p class="font-medium flex items-center">
+                                            1. Add SPF Record 
+                                            <span v-if="sender.verificationDetails.spfVerified" 
+                                                  class="ml-2 text-green-600 text-xs">
+                                                (Verified)
+                                            </span>
+                                        </p>
+                                        <div class="mt-2 bg-white p-2 rounded border">
+                                            <p class="mb-1"><strong>Host:</strong> {{ sender.verificationDetails.spfHost }}</p>
+                                            <p><strong>TXT Value:</strong> {{ sender.verificationDetails.spfTextValue }}</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- DKIM Record -->
+                                    <div>
+                                        <p class="font-medium flex items-center">
+                                            2. Add DKIM Record
+                                            <span v-if="sender.verificationDetails.dkimVerified" 
+                                                  class="ml-2 text-green-600 text-xs">
+                                                (Verified)
+                                            </span>
+                                        </p>
+                                        <div class="mt-2 bg-white p-2 rounded border">
+                                            <p class="mb-1" v-if="sender.verificationDetails.dkimHost">
+                                                <strong>Host:</strong> 
+                                                {{ sender.verificationDetails.dkimHost.split('.')[0] + '._domainkey' }}
+                                            </p>
+                                            <p class="mb-1" v-else>
+                                                <strong>Host:</strong> 
+                                                <span class="text-gray-500 italic">mail._domainkey.{{ sender.verificationDetails.spfHost || sender.Domain }}</span>
+                                            </p>
+                                            <div>
+                                                <strong>TXT Value:</strong>
+                                                <code v-if="sender.verificationDetails && sender.verificationDetails.dkimTextValue" class="mt-1 block whitespace-pre-line bg-gray-50 p-2 rounded font-mono text-sm overflow-x-auto">
+                                                    {{formatDkimTextValue(sender.verificationDetails.dkimTextValue)}}
+                                                </code>
+                                                <p v-else class="mt-1 text-sm text-gray-500 italic">
+                                                    DKIM is configured at the SMTP server level
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Return Path -->
+                                    <div>
+                                        <p class="font-medium flex items-center">
+                                            3. Add Return-Path CNAME Record
+                                            <span v-if="sender.verificationDetails.returnPathDomainVerified" 
+                                                  class="ml-2 text-green-600 text-xs">
+                                                (Verified)
+                                            </span>
+                                        </p>
+                                        <div class="mt-2 bg-white p-2 rounded border">
+                                            <p class="mb-1">
+                                                <strong>Host:</strong> 
+                                                pm-bounces
+                                            </p>
+                                            <p>
+                                                <strong>Points to:</strong> 
+                                                pm.mtasv.net
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <!-- Add after the Return Path section, before the closing divs -->
+                                    <div>
+                                        <p class="font-medium flex items-center">
+                                            4. Activate Email Sending
+                                            <span v-if="sender.Confirmed" 
+                                                  class="ml-2 text-green-600 text-xs">
+                                                (Activated)
+                                            </span>
+                                        </p>
+                                        <div class="mt-2 bg-white p-2 rounded border">
+                                            <p>Click the "Activate" button above to enable email sending once all records are verified.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 text-sm text-gray-600">
+                                        <p>* After adding these records, please allow up to 48 hours for DNS propagation.</p>
+                                        <p>* Click "Check Status" to verify your domain setup.</p>
+                                        <p v-if="!sender.Confirmed" class="mt-2 text-indigo-600">
+                                            * All three records must be verified for full domain verification.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add payment modal -->
+    <div v-if="showPaymentModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <button @click="closePaymentModal" 
+                    class="absolute top-3 right-3 text-gray-500 hover:text-gray-700">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Purchase Phone Number</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500 mb-4">
+                        One-time setup fee: $10.00<br>
+                        Monthly subscription: $4.00
+                    </p>
+                    
+                    <!-- Payment Security Indicators -->
+                    <div class="payment-security-section mb-4 p-3 bg-gray-50 rounded-lg">
+                        <p class="text-sm font-medium text-gray-700 mb-2">Secure Payment</p>
+                        <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                                </svg>
+                                <span>SSL Secured</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>PCI Compliant</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span>Paddle</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="button"
+                            :disabled="purchasing"
+                            @click="openPaddleCheckout"
+                            class="mt-4 w-full bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {{ purchasing ? 'Opening checkout...' : 'Pay with Paddle' }}
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add the status message section after the payment modal -->
+    <div v-if="purchaseStatus" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+            <div class="flex items-center space-x-4">
+                <!-- Processing spinner -->
+                <svg v-if="purchaseStatus.type === 'processing'" 
+                     class="animate-spin h-8 w-8 text-indigo-600" 
+                     xmlns="http://www.w3.org/2000/svg" 
+                     fill="none" 
+                     viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                
+                <!-- Success icon -->
+                <svg v-if="purchaseStatus.type === 'success'" 
+                     class="h-8 w-8 text-green-500" 
+                     fill="none" 
+                     stroke="currentColor" 
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+                
+                <!-- Error icon -->
+                <svg v-if="purchaseStatus.type === 'error'" 
+                     class="h-8 w-8 text-red-500" 
+                     fill="none" 
+                     stroke="currentColor" 
+                     viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                
+                <div>
+                    <h3 class="text-lg font-medium text-gray-900">{{ purchaseStatus.message }}</h3>
+                    <p v-if="purchaseStatus.details" class="mt-1 text-sm text-gray-500">{{ purchaseStatus.details }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.StripeElement {
+    background-color: white;
+    padding: 10px;
+    border-radius: 4px;
+    border: 1px solid #e2e8f0;
+}
+
+.StripeElement--focus {
+    border-color: #4f46e5;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+}
+
+.StripeElement--invalid {
+    border-color: #ef4444;
+}
+
+/* Ensure disabled buttons are ALWAYS visible */
+button:disabled {
+    background-color: #9ca3af !important;
+    cursor: not-allowed !important;
+    opacity: 1 !important;
+}
+
+button:disabled:hover {
+    background-color: #9ca3af !important;
+}
+
+/* Keep enabled button colors */
+button:not(:disabled).bg-blue-600 {
+    background-color: #2563eb !important;
+}
+
+button:not(:disabled).bg-indigo-600 {
+    background-color: #4f46e5 !important;
+}
+
+button:not(:disabled).bg-red-600 {
+    background-color: #dc2626 !important;
+}
+</style>
+
+<script>
+const { createApp } = Vue
+
+createApp({
+    data() {
+        return {
+            areaCode: '',
+            searching: false,
+            purchasing: false,
+            availableNumbers: [],
+            myNumbers: [],
+            newSenderEmail: '',
+            senderEmails: [],
+            isAddingSender: false,
+            showPaymentModal: false,
+            selectedNumber: null,
+            user: null,
+            purchaseStatus: null,
+            smtpSettings: null,
+            smtpForm: {
+                host: '',
+                port: 587,
+                secure: 'none',
+                user: '',
+                pass: ''
+            },
+            testingSMTP: false,
+            savingSMTP: false,
+            deletingSMTP: false,
+            smtpTestResult: null
+        }
+    },
+    computed: {
+        allRecordsVerified() {
+            return this.sender.verificationDetails.spfVerified && 
+                   this.sender.verificationDetails.dkimVerified && 
+                   this.sender.verificationDetails.returnPathDomainVerified;
+        },
+        canTestSMTP() {
+            return this.smtpForm.host && 
+                   this.smtpForm.port && 
+                   this.smtpForm.user && 
+                   this.smtpForm.pass;
+        },
+        canSaveSMTP() {
+            return this.canTestSMTP;
+        }
+    },
+    methods: {
+        formatDkimTextValue(dkimTextValue) {
+            if (!dkimTextValue) {
+                return '';
+            }
+            return dkimTextValue.replace(/\s+/g, '').replace('; ', ';');
+        },
+        onlyNumbers(e) {
+            const char = String.fromCharCode(e.keyCode);
+            if (/[^0-9]/.test(char)) {
+                e.preventDefault();
+            }
+        },
+        
+        async searchNumbers() {
+            if (!this.areaCode) return;
+            
+            this.searching = true;
+            try {
+                const token = localStorage.getItem('token');
+                
+                const response = await fetch(`/api/numbers/search?areaCode=${this.areaCode}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    this.availableNumbers = data.numbers;
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to search numbers');
+                }
+            } catch (error) {
+                console.error('Search numbers error:', error);
+                alert(error.message || 'Failed to search numbers');
+            } finally {
+                this.searching = false;
+            }
+        },
+        
+        async openPaddleCheckout() {
+            if (!this.selectedNumber) return;
+            this.purchasing = true;
+            this.purchaseStatus = { type: 'processing', message: 'Opening checkout...', details: '' };
+            try {
+                const res = await fetch('/api/numbers/paddle-checkout', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ phoneNumber: this.selectedNumber })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to prepare checkout');
+                }
+                const { clientToken, priceId, customData } = await res.json();
+                if (!window.Paddle) throw new Error('Paddle did not load');
+                const self = this;
+                const eventCallback = (e) => {
+                    if (e && e.name === 'checkout.completed') {
+                        self.showPaymentModal = false;
+                        self.purchaseStatus = { type: 'success', message: 'Payment completed!', details: 'Your number will be available shortly.' };
+                        self.loadUserData();
+                        setTimeout(() => { self.purchaseStatus = null; }, 4000);
+                    }
+                };
+                if (!window.Paddle.Initialized) {
+                    window.Paddle.Initialize({ token: clientToken, eventCallback });
+                }
+                window.Paddle.Checkout.open({
+                    items: [{ priceId, quantity: 1 }],
+                    customData
+                });
+            } catch (error) {
+                console.error('Paddle checkout error:', error);
+                this.purchaseStatus = { type: 'error', message: 'Checkout failed', details: error.message };
+                setTimeout(() => { this.purchaseStatus = null; }, 5000);
+            } finally {
+                this.purchasing = false;
+            }
+        },
+        
+        async loadUserData() {
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    this.user = userData;
+                    this.myNumbers = userData.phoneNumbers || [];
+                }
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            }
+        },
+        
+        async loadSenderEmails() {
+            try {
+                const response = await fetch('/api/email/senders', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                if (response.ok) {
+                    this.senderEmails = await response.json();
+                }
+            } catch (error) {
+                console.error('Failed to load sender emails:', error);
+            }
+        },
+
+        async loadSMTPSettings() {
+            try {
+                const response = await fetch('/api/smtp/settings', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                if (response.ok) {
+                    this.smtpSettings = await response.json();
+                    // Pre-fill form if custom settings exist
+                    if (!this.smtpSettings.isGlobal) {
+                        // Determine secure value based on settings
+                        let secureValue;
+                        if (this.smtpSettings.ignoreTLS) {
+                            secureValue = 'none';
+                        } else if (this.smtpSettings.secure === true) {
+                            secureValue = true;
+                        } else {
+                            secureValue = false;
+                        }
+                        
+                        this.smtpForm = {
+                            host: this.smtpSettings.host || '',
+                            port: this.smtpSettings.port || 587,
+                            secure: secureValue,
+                            user: this.smtpSettings.user || '',
+                            pass: '' // Never pre-fill password
+                        };
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load SMTP settings:', error);
+            }
+        },
+
+        async testSMTPConnection() {
+            if (!this.canTestSMTP) return;
+
+            this.testingSMTP = true;
+            this.smtpTestResult = null;
+
+            try {
+                const response = await fetch('/api/smtp/test', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        host: this.smtpForm.host,
+                        port: parseInt(this.smtpForm.port),
+                        secure: this.smtpForm.secure,
+                        user: this.smtpForm.user,
+                        pass: this.smtpForm.pass
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    this.smtpTestResult = {
+                        success: true,
+                        message: 'SMTP connection test successful!'
+                    };
+                } else {
+                    this.smtpTestResult = {
+                        success: false,
+                        message: result.error || 'SMTP connection test failed'
+                    };
+                }
+            } catch (error) {
+                console.error('SMTP test error:', error);
+                this.smtpTestResult = {
+                    success: false,
+                    message: error.message || 'Failed to test SMTP connection'
+                };
+            } finally {
+                this.testingSMTP = false;
+            }
+        },
+
+        async saveSMTPSettings() {
+            if (!this.canSaveSMTP) return;
+
+            this.savingSMTP = true;
+            this.smtpTestResult = null;
+
+            try {
+                const response = await fetch('/api/smtp/settings', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        host: this.smtpForm.host,
+                        port: parseInt(this.smtpForm.port),
+                        secure: this.smtpForm.secure,
+                        user: this.smtpForm.user,
+                        pass: this.smtpForm.pass
+                    })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    await this.loadSMTPSettings();
+                    this.smtpTestResult = {
+                        success: true,
+                        message: 'SMTP settings saved successfully!'
+                    };
+                    // Clear password field after successful save
+                    this.smtpForm.pass = '';
+                } else {
+                    const error = await response.json();
+                    this.smtpTestResult = {
+                        success: false,
+                        message: error.error || 'Failed to save SMTP settings'
+                    };
+                }
+            } catch (error) {
+                console.error('Save SMTP settings error:', error);
+                this.smtpTestResult = {
+                    success: false,
+                    message: error.message || 'Failed to save SMTP settings'
+                };
+            } finally {
+                this.savingSMTP = false;
+            }
+        },
+
+        async deleteSMTPSettings() {
+            if (!confirm('Are you sure you want to remove your custom SMTP settings? The system will use the default SMTP server.')) {
+                return;
+            }
+
+            this.deletingSMTP = true;
+            this.smtpTestResult = null;
+
+            try {
+                const response = await fetch('/api/smtp/settings', {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (response.ok) {
+                    await this.loadSMTPSettings();
+                    this.smtpForm = {
+                        host: '',
+                        port: 587,
+                        secure: 'none',
+                        user: '',
+                        pass: ''
+                    };
+                    this.smtpTestResult = {
+                        success: true,
+                        message: 'Custom SMTP settings removed. Using default SMTP server.'
+                    };
+                } else {
+                    const error = await response.json();
+                    this.smtpTestResult = {
+                        success: false,
+                        message: error.error || 'Failed to remove SMTP settings'
+                    };
+                }
+            } catch (error) {
+                console.error('Delete SMTP settings error:', error);
+                this.smtpTestResult = {
+                    success: false,
+                    message: error.message || 'Failed to remove SMTP settings'
+                };
+            } finally {
+                this.deletingSMTP = false;
+            }
+        },
+
+        
+        async addSenderEmail() {
+            if (!this.newSenderEmail) return;
+            
+            this.isAddingSender = true;
+            try {
+                const response = await fetch('/api/email/senders', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ email: this.newSenderEmail })
+                });
+
+                if (response.ok) {
+                    await this.loadSenderEmails();
+                    this.newSenderEmail = '';
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.message);
+                }
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                this.isAddingSender = false;
+            }
+        },
+        
+        async checkVerification(senderId) {
+            try {
+                const response = await fetch(`/api/email/senders/${senderId}/verify`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to verify domain');
+                }
+
+                const data = await response.json();
+                // Update local state
+                const senderIndex = this.senderEmails.findIndex(s => s.id === senderId);
+                if (senderIndex !== -1) {
+                    this.senderEmails[senderIndex] = data.sender;
+                }
+
+                alert(data.message);
+            } catch (error) {
+                console.error('Failed to verify domain:', error);
+                alert(error.message);
+            }
+        },
+        
+        getStatusClass(isConfirmed) {
+            return isConfirmed 
+                ? 'text-green-600 text-sm' 
+                : 'text-yellow-600 text-sm';
+        },
+        
+        async refreshVerificationDetails(senderId) {
+            try {
+                const response = await fetch(`/api/email/senders/${senderId}/details`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const details = await response.json();
+                    // Update the sender's verification details
+                    const senderIndex = this.senderEmails.findIndex(s => s.id === senderId);
+                    if (senderIndex !== -1) {
+                        this.senderEmails[senderIndex].verificationDetails = details;
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to refresh verification details:', error);
+            }
+        },
+        
+        async deleteSender(senderId) {
+            if (!confirm('Are you sure you want to delete this sender? This cannot be undone.')) {
+                return;
+            }
+
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    throw new Error('Not authenticated');
+                }
+
+                const response = await fetch(`/api/email/senders/${senderId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to delete sender');
+                }
+
+                // Remove from local list
+                this.senderEmails = this.senderEmails.filter(s => s.id !== senderId);
+                alert('Sender deleted successfully');
+            } catch (error) {
+                console.error('Failed to delete sender:', error);
+                alert(error.message || 'Failed to delete sender');
+            }
+        },
+        
+        async checkEmailConfirmation(senderId) {
+            try {
+                const response = await fetch(`/api/email/senders/${senderId}/check-email`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Failed to check email confirmation');
+                }
+
+                const data = await response.json();
+                // Update local state
+                const senderIndex = this.senderEmails.findIndex(s => s.id === senderId);
+                if (senderIndex !== -1) {
+                    this.senderEmails[senderIndex].emailConfirmed = data.emailConfirmed;
+                }
+
+                alert(data.message);
+            } catch (error) {
+                console.error('Failed to check email confirmation:', error);
+                alert(error.message);
+            }
+        },
+
+        isAllRecordsVerified(sender) {
+            return sender.verificationDetails?.spfVerified && 
+                   sender.verificationDetails?.dkimVerified && 
+                   sender.verificationDetails?.returnPathDomainVerified;
+        },
+
+        isReadyToActivate(sender) {
+            return sender.emailConfirmed && 
+                   sender.verificationDetails?.spfVerified && 
+                   sender.verificationDetails?.dkimVerified && 
+                   sender.verificationDetails?.returnPathDomainVerified;
+        },
+
+        async activateSender(senderId) {
+            try {
+                const response = await fetch(`/api/email/senders/${senderId}/activate`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to activate sender');
+                }
+
+                const data = await response.json();
+                
+                // Update local state
+                const senderIndex = this.senderEmails.findIndex(s => s.id === senderId);
+                if (senderIndex !== -1) {
+                    this.senderEmails[senderIndex] = {
+                        ...this.senderEmails[senderIndex],
+                        Confirmed: true
+                    };
+                }
+
+                alert('Sender activated successfully!');
+            } catch (error) {
+                console.error('Failed to activate sender:', error);
+                alert(error.message);
+            }
+        },
+
+        async deactivateSender(senderId) {
+            if (!confirm('Are you sure you want to deactivate this sender?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/email/senders/${senderId}/deactivate`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to deactivate sender');
+                }
+
+                const data = await response.json();
+                
+                // Update local state
+                const senderIndex = this.senderEmails.findIndex(s => s.id === senderId);
+                if (senderIndex !== -1) {
+                    this.senderEmails[senderIndex] = {
+                        ...this.senderEmails[senderIndex],
+                        Confirmed: false
+                    };
+                }
+
+                alert('Sender deactivated successfully!');
+            } catch (error) {
+                console.error('Failed to deactivate sender:', error);
+                alert(error.message);
+            }
+        },
+
+        initializeStripe() {
+            this.stripe = Stripe('<%= STRIPE_PUBLIC_KEY %>');
+        },
+
+        openPaymentModal(phoneNumber) {
+            this.selectedNumber = phoneNumber;
+            this.showPaymentModal = true;
+            
+            // Initialize Stripe elements in next tick to ensure modal is rendered
+            this.$nextTick(() => {
+                const elements = this.stripe.elements();
+                this.card = elements.create('card');
+                this.card.mount('#card-element');
+
+                // Set up form handler
+                const form = document.getElementById('payment-form');
+                form.addEventListener('submit', this.handlePaymentSubmit);
+            });
+        },
+
+        async handlePaymentSubmit(event) {
+            event.preventDefault();
+            
+            try {
+                const { paymentMethod, error } = await this.stripe.createPaymentMethod({
+                    type: 'card',
+                    card: this.card
+                });
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+
+                this.paymentMethodId = paymentMethod.id;
+                await this.purchaseNumber(this.selectedNumber);
+            } catch (error) {
+                console.error('Payment error:', error);
+                alert(error.message);
+            }
+        },
+
+        closePaymentModal() {
+            this.showPaymentModal = false;
+            this.selectedNumber = null;
+            if (this.card) {
+                this.card.destroy();
+            }
+        },
+
+        async setDefaultNumber(phoneNumber) {
+            try {
+                const response = await fetch('/api/numbers/set-default', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({ phoneNumber })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to set default number');
+                }
+
+                await this.loadUserData(); // Reload numbers after setting default
+            } catch (error) {
+                console.error('Failed to set default number:', error);
+                alert(error.message);
+            }
+        }
+    },
+    async created() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            if (window.redirectToLogin) window.redirectToLogin('no_token', { from: 'my-numbers' });
+            else window.location.replace('/login?loop=1&reason=no_token&from=my-numbers');
+            return;
+        }
+
+        await this.loadUserData();
+        await this.loadSenderEmails();
+        await this.loadSMTPSettings();
+    }
+}).mount('#app')
+</script>
+
+<!-- Load Utilities -->
+<script src="/js/utils/api.js"></script> 

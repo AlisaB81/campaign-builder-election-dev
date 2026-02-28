@@ -1,0 +1,338 @@
+<%- include('../partials/nav') %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <div class="py-6 space-y-6">
+        <div class="bg-white shadow rounded-lg p-6">
+            <h1 class="text-2xl font-bold text-gray-900">Email Sender Settings</h1>
+            <p class="text-gray-600 mt-1">Configure sender emails per account. Each sender requires DNS setup (SPF, DKIM, Return-Path) and a verified sender email address. Only visible in admin view.</p>
+        </div>
+
+        <div class="bg-white shadow rounded-lg p-6">
+            <div v-if="loading" class="text-center py-8 text-gray-500">Loading accounts...</div>
+            <div v-else-if="accounts.length === 0" class="text-center py-8 text-gray-500">No accounts found.</div>
+            <div v-else class="space-y-8">
+                <div v-for="account in accounts" :key="account.id" class="border border-gray-200 rounded-lg p-6">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h2 class="text-lg font-semibold text-gray-900">{{ formatAccountName(account) }}</h2>
+                            <p class="text-sm text-gray-500">{{ account.email }} (ID: {{ account.id }}) <span v-if="account.userType" class="text-gray-400">— {{ account.userType }}</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Add New Sender -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Add Sending Email</label>
+                        <div class="flex flex-wrap gap-2 items-end">
+                            <div>
+                                <input v-model="addForm[account.id].email" type="email" placeholder="noreply@example.com"
+                                    class="border rounded-md px-3 py-2 text-sm w-56">
+                            </div>
+                            <div>
+                                <input v-model="addForm[account.id].fromName" type="text" placeholder="From name (optional)"
+                                    class="border rounded-md px-3 py-2 text-sm w-48">
+                            </div>
+                            <button @click="addSender(account.id)"
+                                    :disabled="!addForm[account.id].email || adding[account.id]"
+                                    class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 text-sm font-medium">
+                                {{ adding[account.id] ? 'Adding…' : 'Add' }}
+                            </button>
+                        </div>
+                        <p v-if="addError[account.id]" class="mt-2 text-sm text-red-600">{{ addError[account.id] }}</p>
+                    </div>
+
+                    <!-- Sender List (legacy-style with DNS + verification) -->
+                    <div v-if="sendersByAccount[account.id] && sendersByAccount[account.id].length">
+                        <h3 class="text-base font-medium text-gray-800 mb-4">Senders</h3>
+                        <div class="space-y-4">
+                            <div v-for="sender in sendersByAccount[account.id]" :key="sender.id" class="border rounded-lg p-4">
+                                <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mb-2">
+                                    <p class="font-medium break-words">{{ sender.EmailAddress }}</p>
+                                    <span v-if="sender.FromName" class="text-gray-500 text-sm">({{ sender.FromName }})</span>
+                                    <div class="flex flex-wrap gap-2">
+                                        <span :class="{
+                                            'px-2 py-1 text-xs rounded-full flex items-center': true,
+                                            'bg-green-100 text-green-800': sender.emailConfirmed,
+                                            'bg-yellow-100 text-yellow-800': !sender.emailConfirmed
+                                        }">
+                                            <svg v-if="sender.emailConfirmed" class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Email Confirmation
+                                        </span>
+                                        <span :class="{
+                                            'px-2 py-1 text-xs rounded-full flex items-center': true,
+                                            'bg-green-100 text-green-800': isAllRecordsVerified(sender),
+                                            'bg-yellow-100 text-yellow-800': !isAllRecordsVerified(sender)
+                                        }">
+                                            <svg v-if="isAllRecordsVerified(sender)" class="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            DNS Records
+                                        </span>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button @click="checkEmailConfirmation(account.id, sender.id)" class="text-indigo-600 hover:text-indigo-800 text-sm">Check Email Status</button>
+                                        <button @click="checkVerification(account.id, sender.id)" class="text-indigo-600 hover:text-indigo-800 text-sm">Check DNS Records</button>
+                                        <button v-if="!sender.Confirmed && isReadyToActivate(sender)" @click="activateSender(account.id, sender.id)" class="text-green-600 hover:text-green-800 text-sm font-medium">Activate</button>
+                                        <button v-if="sender.Confirmed" @click="deactivateSender(account.id, sender.id)" class="text-orange-600 hover:text-orange-800 text-sm font-medium">Deactivate</button>
+                                        <button @click="deleteSender(account.id, sender.id)" class="text-red-600 hover:text-red-800 text-sm">Delete</button>
+                                        <template v-if="editingSender && editingSender.id === sender.id && editingSender.accountId === account.id">
+                                            <input v-model="editingSender.fromName" type="text" placeholder="From name" class="border rounded px-2 py-1 w-40 text-sm">
+                                            <button @click="saveSenderEdit(account.id, sender.id)" class="px-2 py-1 bg-indigo-600 text-white rounded text-xs">Save</button>
+                                            <button @click="editingSender = null" class="px-2 py-1 border rounded text-xs">Cancel</button>
+                                        </template>
+                                        <button v-else-if="!editingSender" @click="editingSender = { id: sender.id, accountId: account.id, fromName: sender.FromName || '' }" class="text-indigo-600 hover:text-indigo-800 text-xs">Edit name</button>
+                                    </div>
+                                </div>
+
+                                <!-- Verification Steps (expandable) -->
+                                <div class="mt-4">
+                                    <button @click="toggleShowSteps(account.id, sender.id)" class="flex items-center text-gray-700 mb-2">
+                                        <svg :class="{'transform rotate-180': sender.showSteps}" class="w-5 h-5 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                        <span class="ml-2">Verification Steps</span>
+                                    </button>
+                                    <div v-show="sender.showSteps" class="bg-gray-50 p-4 rounded text-sm">
+                                        <div class="space-y-4" v-if="(sender.verificationDetails || {}).spfHost !== undefined">
+                                            <div>
+                                                <p class="font-medium flex items-center">1. Add SPF Record <span v-if="(sender.verificationDetails || {}).spfVerified" class="ml-2 text-green-600 text-xs">(Verified)</span></p>
+                                                <div class="mt-2 bg-white p-2 rounded border">
+                                                    <p class="mb-1"><strong>Host:</strong> {{ (sender.verificationDetails || {}).spfHost }}</p>
+                                                    <p><strong>TXT Value:</strong> {{ (sender.verificationDetails || {}).spfTextValue }}</p>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p class="font-medium flex items-center">2. Add DKIM Record <span v-if="(sender.verificationDetails || {}).dkimVerified" class="ml-2 text-green-600 text-xs">(Verified)</span></p>
+                                                <div class="mt-2 bg-white p-2 rounded border">
+                                                    <p class="mb-1" v-if="(sender.verificationDetails || {}).dkimHost"><strong>Host:</strong> {{ (sender.verificationDetails || {}).dkimHost }}</p>
+                                                    <p class="mb-1" v-else><strong>Host:</strong> <span class="text-gray-500 italic">mail._domainkey.{{ (sender.verificationDetails || {}).spfHost || sender.Domain }}</span></p>
+                                                    <div>
+                                                        <strong>TXT Value:</strong>
+                                                        <code v-if="(sender.verificationDetails || {}).dkimTextValue" class="mt-1 block whitespace-pre-line bg-gray-50 p-2 rounded font-mono text-sm overflow-x-auto">{{ formatDkimTextValue((sender.verificationDetails || {}).dkimTextValue) }}</code>
+                                                        <p v-else class="mt-1 text-sm text-gray-500 italic">DKIM is configured at the SMTP server level</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p class="font-medium flex items-center">3. Add Return-Path CNAME Record <span v-if="(sender.verificationDetails || {}).returnPathDomainVerified" class="ml-2 text-green-600 text-xs">(Verified)</span></p>
+                                                <div class="mt-2 bg-white p-2 rounded border">
+                                                    <p class="mb-1"><strong>Host:</strong> {{ (sender.verificationDetails || {}).returnPathHost || 'bounces' }}</p>
+                                                    <p><strong>Points to:</strong> {{ (sender.verificationDetails || {}).returnPathDomain || 'mail.sw7ft.com' }}</p>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p class="font-medium flex items-center">4. Activate Email Sending <span v-if="sender.Confirmed" class="ml-2 text-green-600 text-xs">(Activated)</span></p>
+                                                <div class="mt-2 bg-white p-2 rounded border">
+                                                    <p>Click the "Activate" button above to enable email sending once all records are verified.</p>
+                                                </div>
+                                            </div>
+                                            <div class="mt-4 text-sm text-gray-600">
+                                                <p>* After adding these records, please allow up to 48 hours for DNS propagation.</p>
+                                                <p>* Click "Check DNS Records" to verify your domain setup.</p>
+                                                <p v-if="!sender.Confirmed" class="mt-2 text-indigo-600">* All three records must be verified for full domain verification.</p>
+                                            </div>
+                                        </div>
+                                        <p v-else class="text-gray-500 italic">No verification details yet. Add the sender and configure DNS per the steps above.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <p v-else class="text-gray-500 text-sm">No senders configured. Add one above.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue;
+createApp({
+    data() {
+        return {
+            accounts: [],
+            sendersByAccount: {},
+            loading: true,
+            addForm: {},
+            adding: {},
+            addError: {},
+            editingSender: null
+        };
+    },
+    methods: {
+        async loadAccounts() {
+            try {
+                const r = await fetch('/api/admin/accounts', { credentials: 'include' });
+                if (r.ok) {
+                    this.accounts = await r.json();
+                    this.accounts.forEach(a => {
+                        this.addForm[a.id] = this.addForm[a.id] || { email: '', fromName: '' };
+                        this.adding[a.id] = false;
+                    });
+                    await this.loadSendersForAll();
+                }
+            } catch (e) {
+                console.error(e);
+            } finally {
+                this.loading = false;
+            }
+        },
+        async loadSendersForAll() {
+            for (const a of this.accounts) {
+                try {
+                    const r = await fetch(`/api/admin/accounts/${a.id}/senders`, { credentials: 'include' });
+                    const list = r.ok ? await r.json() : [];
+                    list.forEach(s => { if (s.showSteps === undefined) s.showSteps = false; });
+                    this.sendersByAccount[a.id] = list;
+                } catch (e) {
+                    this.sendersByAccount[a.id] = [];
+                }
+            }
+        },
+        formatDkimTextValue(v) {
+            if (!v) return '';
+            return String(v).replace(/\s+/g, '').replace('; ', ';');
+        },
+        isAllRecordsVerified(sender) {
+            const vd = sender.verificationDetails || {};
+            return vd.spfVerified && vd.dkimVerified && vd.returnPathDomainVerified;
+        },
+        isReadyToActivate(sender) {
+            const vd = sender.verificationDetails || {};
+            return sender.emailConfirmed && vd.spfVerified && vd.dkimVerified && vd.returnPathDomainVerified;
+        },
+        toggleShowSteps(accountId, senderId) {
+            const list = this.sendersByAccount[accountId] || [];
+            const s = list.find(x => x.id === senderId || String(x.id) === String(senderId));
+            if (s) s.showSteps = !s.showSteps;
+        },
+        async addSender(accountId) {
+            const email = (this.addForm[accountId] && this.addForm[accountId].email) ? this.addForm[accountId].email.trim() : '';
+            if (!email) return;
+            this.addError[accountId] = '';
+            this.adding[accountId] = true;
+            try {
+                const r = await fetch(`/api/admin/accounts/${accountId}/senders`, {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email,
+                        fromName: (this.addForm[accountId] && this.addForm[accountId].fromName) ? this.addForm[accountId].fromName.trim() : null
+                    })
+                });
+                const data = await r.json().catch(() => ({}));
+                if (r.ok) {
+                    this.sendersByAccount[accountId] = data;
+                    this.addForm[accountId].email = '';
+                    this.addForm[accountId].fromName = '';
+                } else {
+                    this.addError[accountId] = data.error || 'Failed to add sender';
+                }
+            } catch (e) {
+                this.addError[accountId] = e.message || 'Request failed';
+            } finally {
+                this.adding[accountId] = false;
+            }
+        },
+        formatAccountName(account) {
+            if (!account) return 'Account';
+            const n = account.name;
+            if (typeof n === 'string') return n || account.email || 'Account ' + account.id;
+            if (n && typeof n === 'object' && (n.name || n.email)) return n.name || n.email;
+            return account.email || 'Account ' + account.id;
+        },
+        async saveSenderEdit(accountId, senderId) {
+            if (!this.editingSender || this.editingSender.id !== senderId) return;
+            const fromName = this.editingSender.fromName ? String(this.editingSender.fromName).trim() : null;
+            try {
+                const r = await fetch(`/api/admin/accounts/${accountId}/senders/${senderId}`, {
+                    method: 'PUT',
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ fromName })
+                });
+                if (r.ok) {
+                    const updated = await r.json();
+                    const list = this.sendersByAccount[accountId] || [];
+                    const idx = list.findIndex(s => s.id === senderId || String(s.id) === String(senderId));
+                    if (idx !== -1) list[idx] = { ...list[idx], FromName: updated.FromName };
+                    this.editingSender = null;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        },
+        async checkEmailConfirmation(accountId, senderId) {
+            try {
+                const r = await fetch(`/api/admin/accounts/${accountId}/senders/${senderId}/check-email`, { credentials: 'include' });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(data.error || 'Failed to check email');
+                const list = this.sendersByAccount[accountId] || [];
+                const idx = list.findIndex(s => s.id === senderId || String(s.id) === String(senderId));
+                if (idx !== -1) list[idx].emailConfirmed = data.emailConfirmed;
+                alert(data.message || 'Email status checked.');
+            } catch (e) {
+                alert(e.message || 'Request failed');
+            }
+        },
+        async checkVerification(accountId, senderId) {
+            try {
+                const r = await fetch(`/api/admin/accounts/${accountId}/senders/${senderId}/verify`, { credentials: 'include' });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(data.error || 'Failed to verify');
+                const list = this.sendersByAccount[accountId] || [];
+                const idx = list.findIndex(s => s.id === senderId || String(s.id) === String(senderId));
+                if (idx !== -1 && data.sender) list[idx] = data.sender;
+                alert(data.message || 'Verification status checked.');
+            } catch (e) {
+                alert(e.message || 'Request failed');
+            }
+        },
+        async activateSender(accountId, senderId) {
+            try {
+                const r = await fetch(`/api/admin/accounts/${accountId}/senders/${senderId}/activate`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(data.error || 'Failed to activate');
+                const list = this.sendersByAccount[accountId] || [];
+                const idx = list.findIndex(s => s.id === senderId || String(s.id) === String(senderId));
+                if (idx !== -1) list[idx].Confirmed = true;
+                alert('Sender activated successfully.');
+            } catch (e) {
+                alert(e.message || 'Request failed');
+            }
+        },
+        async deactivateSender(accountId, senderId) {
+            if (!confirm('Deactivate this sender?')) return;
+            try {
+                const r = await fetch(`/api/admin/accounts/${accountId}/senders/${senderId}/deactivate`, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } });
+                const data = await r.json().catch(() => ({}));
+                if (!r.ok) throw new Error(data.error || 'Failed to deactivate');
+                const list = this.sendersByAccount[accountId] || [];
+                const idx = list.findIndex(s => s.id === senderId || String(s.id) === String(senderId));
+                if (idx !== -1) list[idx].Confirmed = false;
+                alert('Sender deactivated.');
+            } catch (e) {
+                alert(e.message || 'Request failed');
+            }
+        },
+        async deleteSender(accountId, senderId) {
+            if (!confirm('Remove this sender? This cannot be undone.')) return;
+            try {
+                const r = await fetch(`/api/admin/accounts/${accountId}/senders/${senderId}`, { method: 'DELETE', credentials: 'include' });
+                if (r.ok) this.sendersByAccount[accountId] = await r.json();
+                else {
+                    const data = await r.json().catch(() => ({}));
+                    throw new Error(data.error || 'Failed to delete');
+                }
+            } catch (e) {
+                alert(e.message || 'Request failed');
+            }
+        }
+    },
+    async created() {
+        await this.loadAccounts();
+    }
+}).mount('#app');
+</script>

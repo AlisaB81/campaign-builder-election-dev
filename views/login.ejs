@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campaign Builder - Sign in</title>
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: #f3f4f6; }
+    main { max-width: 420px; margin: 80px auto; padding: 0 16px; }
+    section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+    h1 { margin: 0 0 4px; font-size: 24px; color: #111827; }
+    .sub { margin: 0 0 16px; color: #6b7280; font-size: 14px; }
+    label { display: block; font-size: 14px; color: #374151; margin: 12px 0 6px; }
+    input { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 8px; padding: 10px 12px; font-size: 16px; }
+    input:focus { outline: 2px solid #6366f1; border-color: #6366f1; }
+    button { width: 100%; margin-top: 12px; border: 0; border-radius: 8px; padding: 11px 14px; background: #4f46e5; color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    #login-error { min-height: 20px; margin: 10px 0 0; color: #dc2626; font-size: 14px; }
+    .legal { margin-top: 12px; text-align: center; font-size: 13px; color: #6b7280; }
+    .legal a { color: #4f46e5; text-decoration: none; }
+    .legal a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>Campaign Builder</h1>
+      <p class="sub">Sign in to your account</p>
+
+      <form id="login-form">
+        <div>
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required autocomplete="username"
+                 >
+        </div>
+
+        <div>
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" required autocomplete="current-password"
+                 >
+        </div>
+
+        <p id="login-error"></p>
+
+        <button id="login-submit" type="submit"
+                >
+          Sign in
+        </button>
+      </form>
+      <p class="legal">By signing in, you agree to our <a href="/terms-and-conditions">Terms and Conditions</a>.</p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var form = document.getElementById('login-form');
+      var errorEl = document.getElementById('login-error');
+      var submitBtn = document.getElementById('login-submit');
+
+      form.addEventListener('submit', async function (event) {
+        event.preventDefault();
+        errorEl.textContent = '';
+        submitBtn.disabled = true;
+
+        var payload = {
+          email: form.email.value.trim(),
+          password: form.password.value
+        };
+
+        try {
+          var response = await fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(payload)
+          });
+
+          var data = {};
+          try {
+            data = await response.json();
+          } catch (jsonErr) {
+            data = {};
+          }
+
+          if (!response.ok) {
+            errorEl.textContent = data.error || data.message || 'Login failed.';
+            return;
+          }
+
+          window.location.href = data.redirectTo || '/dashboard';
+        } catch (err) {
+          errorEl.textContent = 'Network error. Please try again.';
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

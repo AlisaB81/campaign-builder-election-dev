@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unsubscribe - Campaign Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
+            <div class="text-center">
+                <h2 class="text-3xl font-bold text-gray-900">Campaign Builder</h2>
+                <p class="mt-2 text-gray-600">Manage your communication preferences</p>
+            </div>
+
+            <!-- Success/Error Messages -->
+            <div id="messageContainer" class="hidden">
+                <div id="successMessage" class="hidden bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded">
+                    <p id="successText"></p>
+                </div>
+                <div id="errorMessage" class="hidden bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded">
+                    <p id="errorText"></p>
+                </div>
+            </div>
+
+            <!-- Unsubscribe Form -->
+            <div id="unsubscribeForm">
+                <form id="unsubscribeFormElement" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                        <input type="email" id="emailInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="your@email.com" required>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Or Phone Number</label>
+                        <input type="tel" id="phoneInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder="(555) 123-4567">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-3">Unsubscribe from:</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" name="channels" value="email" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-2 text-sm text-gray-700">✉️ Email newsletters</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" name="channels" value="sms" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-2 text-sm text-gray-700">📱 SMS messages</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" name="channels" value="voice" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-2 text-sm text-gray-700">📞 Voice calls</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="unsubscribeAll" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                <span class="ml-2 text-sm font-medium text-gray-900">All communications</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Optional: Tell us why</label>
+                        <select id="reasonSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="">Select a reason (optional)</option>
+                            <option value="Too frequent">Too frequent</option>
+                            <option value="Not relevant">Not relevant</option>
+                            <option value="Wrong content">Wrong content</option>
+                            <option value="No longer interested">No longer interested</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <button type="submit" class="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500">
+                            Unsubscribe
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-6 text-center">
+                    <p class="text-xs text-gray-500">
+                        Note: It may take up to 10 business days to process your request for email communications. SMS and voice opt-outs are processed immediately.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('unsubscribeFormElement');
+        const emailInput = document.getElementById('emailInput');
+        const phoneInput = document.getElementById('phoneInput');
+        const unsubscribeAll = document.getElementById('unsubscribeAll');
+        const messageContainer = document.getElementById('messageContainer');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Handle "Unsubscribe All" checkbox
+        unsubscribeAll.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('input[name="channels"]');
+            checkboxes.forEach(cb => {
+                cb.checked = this.checked;
+            });
+        });
+
+        // Handle individual checkbox changes
+        document.querySelectorAll('input[name="channels"]').forEach(cb => {
+            cb.addEventListener('change', function() {
+                if (!this.checked) {
+                    unsubscribeAll.checked = false;
+                } else {
+                    const allChecked = Array.from(document.querySelectorAll('input[name="channels"]')).every(c => c.checked);
+                    unsubscribeAll.checked = allChecked;
+                }
+            });
+        });
+
+        // Pre-fill from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const emailParam = urlParams.get('email');
+        const phoneParam = urlParams.get('phone');
+        const channelParam = urlParams.get('type'); // 'email', 'sms', or 'voice'
+
+        if (emailParam) {
+            emailInput.value = decodeURIComponent(emailParam);
+        }
+        if (phoneParam) {
+            phoneInput.value = decodeURIComponent(phoneParam);
+        }
+        if (channelParam) {
+            const channelCheckbox = document.querySelector(`input[name="channels"][value="${channelParam}"]`);
+            if (channelCheckbox) {
+                channelCheckbox.checked = true;
+            }
+        }
+
+        form.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const email = emailInput.value.trim();
+            const phone = phoneInput.value.trim();
+            const selectedChannels = Array.from(document.querySelectorAll('input[name="channels"]:checked')).map(cb => cb.value);
+            const reason = document.getElementById('reasonSelect').value;
+
+            if (!email && !phone) {
+                showError('Please provide either an email address or phone number.');
+                return;
+            }
+
+            if (selectedChannels.length === 0) {
+                showError('Please select at least one communication channel to unsubscribe from.');
+                return;
+            }
+
+            // Hide previous messages
+            hideMessages();
+
+            // Unsubscribe from each selected channel
+            const unsubscribePromises = selectedChannels.map(channel => {
+                return fetch('/api/unsubscribe', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        channel: channel,
+                        email: email || null,
+                        phone: phone || null,
+                        reason: reason || null
+                    })
+                });
+            });
+
+            try {
+                const results = await Promise.all(unsubscribePromises);
+                const allSuccessful = results.every(r => r.ok);
+
+                if (allSuccessful) {
+                    const channelNames = selectedChannels.map(c => {
+                        if (c === 'email') return 'email';
+                        if (c === 'sms') return 'SMS';
+                        if (c === 'voice') return 'voice calls';
+                        return c;
+                    }).join(', ');
+
+                    showSuccess(`Successfully unsubscribed from ${channelNames}. You will no longer receive these communications.`);
+                    document.getElementById('unsubscribeForm').style.display = 'none';
+                } else {
+                    const errors = await Promise.all(results.map(r => r.json().catch(() => ({ error: 'Unknown error' }))));
+                    showError('Failed to unsubscribe. Please try again or contact support.');
+                }
+            } catch (error) {
+                console.error('Unsubscribe error:', error);
+                showError('An error occurred. Please try again later.');
+            }
+        });
+
+        function showSuccess(message) {
+            messageContainer.classList.remove('hidden');
+            successMessage.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            document.getElementById('successText').textContent = message;
+        }
+
+        function showError(message) {
+            messageContainer.classList.remove('hidden');
+            errorMessage.classList.remove('hidden');
+            successMessage.classList.add('hidden');
+            document.getElementById('errorText').textContent = message;
+        }
+
+        function hideMessages() {
+            messageContainer.classList.add('hidden');
+            successMessage.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
+

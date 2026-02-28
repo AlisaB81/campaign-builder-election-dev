@@ -1,0 +1,118 @@
+Campaign Builder — Leadership Campaign Expansion Context (Cursor)
+
+PURPOSE
+Extend Campaign Builder (political-only) to support leadership campaign field operations:
+1) Scheduling & Events
+2) Canvassing (Volunteer mode)
+3) Polling / Vote marking (Scrutineer mode)
+Do NOT change existing SMS/email/AI calling features except to integrate new modules (reminders, analytics).
+
+CURRENT BASELINE (ALREADY EXISTS)
+- JWT auth, 2FA, user invitations
+- NDA enforcement with audit trail (timestamp, IP, user agent)
+- Role/permission system exists (account/team)
+- Contact Manager + categories/pollNumber
+- Messaging: SMS, email, AI calling + analytics
+- Audit logs exist
+
+HIGH-LEVEL DESIGN
+Introduce Campaign-scoped features without breaking existing account-shared data:
+- A “Campaign” is a top-level object for leadership work.
+- Users get campaign roles and campaign-scoped permissions.
+- Field modules store data in campaign-specific JSON files and reference contacts by contactId.
+
+DATA STORAGE (JSON, FILE PATHS)
+Create campaign data under:
+data/shared-data/{accountId}/campaigns/{campaignId}/
+Files (v1):
+- campaign.json (metadata, status, electionDayMode flag)
+- campaign-users.json (userId, role, overrides, invitedBy, timestamps)
+- events.json
+- event-signups.json (optional)
+- canvass-turfs.json
+- canvass-assignments.json
+- canvass-results.json
+- polling-stations.json
+- vote-marks.json
+
+CONTACTS
+Contacts remain in existing contacts.json.
+New modules reference contacts by contactId only.
+Never duplicate full contact records into campaign files.
+
+ROLES (CAMPAIGN-SCOPED)
+- campaign_admin: full access, can manage users/roles, can enable election day mode
+- campaign_manager: ops access, can manage users/roles EXCEPT cannot grant campaign_admin
+- organizer: manage events, manage canvass assignments, view aggregates
+- volunteer: canvass input only; limited contact visibility
+- scrutineer: vote marking only; election day mode only
+- analyst: read-only dashboards + aggregates
+
+PERMISSION RULES (MUST ENFORCE)
+- All protected routes require NDA acceptance (already implemented).
+- Add campaign RBAC middleware:
+  requireCampaignRole(campaignId, allowedRoles[])
+- Volunteers:
+  - cannot export any data
+  - cannot browse all contacts
+  - can only search/view contacts within assigned turf
+  - can only submit canvass results
+- Scrutineers:
+  - can only access polling routes if electionDayMode=true
+  - can only mark “voted” and view minimal voter info
+  - every vote mark must be audit logged
+- Analysts:
+  - no write actions; dashboards only
+
+UI PAGES (EJS/VUE, MOBILE-FIRST)
+Admin/Manager:
+- /campaign/:campaignId/admin (tabs: campaign profile, users & roles, audit log)
+- /campaign/:campaignId/events
+- /campaign/:campaignId/canvass/manage
+- /campaign/:campaignId/polling/manage
+Volunteer:
+- /campaign/:campaignId/volunteer (my events + my canvass assignment)
+- /campaign/:campaignId/canvass (search within turf, record result)
+Scrutineer:
+- /campaign/:campaignId/polling (select station/poll, search voter, mark voted)
+Analyst:
+- /campaign/:campaignId/analytics (aggregates + turnout)
+
+EVENTS (V1 MINIMUM)
+Event fields:
+- id, campaignId, title, category, location, startTime, endTime, notes
+- status: draft|pending|approved|cancelled
+- createdBy, approvedBy, approvedAt
+Optional: visibility public|volunteer|internal
+
+CANVASSING (V1 MINIMUM)
+- Turf: id, campaignId, name, pollNumber(s) or neighbourhood, notes
+- Assignment: turfId, volunteerId, start/end dates, createdBy
+- Result: contactId, turfId, volunteerId, timestamp, supportLevel, issues[], followUpRequested, notes (limit length)
+
+POLLING / VOTE MARKING (V1 MINIMUM)
+- PollingStation: id, campaignId, name, pollNumbers[]
+- VoteMark: contactId, stationId, pollNumber, markedBy, timestamp
+ElectionDayMode:
+- stored on campaign.json
+- scrutineer routes hard-block unless enabled
+
+AUDIT LOGGING (REQUIRED)
+Log:
+- user invites, role changes
+- electionDayMode toggles
+- vote marks
+Include: timestamp, userId, campaignId, action, targetId, ip, userAgent (reuse existing audit logger).
+
+IMPLEMENTATION CONSTRAINTS
+- server.js is large/monolithic; prefer adding new route modules carefully or grouping routes with clear section headers.
+- Use existing safe JSON read/write utilities and backup strategy.
+- Do not introduce breaking changes.
+- Keep v1 minimal and shippable; prioritize correctness, security, and fast mobile UX.
+
+DELIVERABLES (V1)
+1) Campaign model + campaign admin UI
+2) Campaign-scoped roles + middleware enforcement
+3) Events module (create/approve/list)
+4) Canvassing module (assign turf, volunteer input)
+5) Polling module (election day mode + vote mark + turnout counts)

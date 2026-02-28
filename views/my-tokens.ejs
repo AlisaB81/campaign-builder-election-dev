@@ -1,0 +1,621 @@
+<%- include('partials/nav') %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <div class="py-6 space-y-6">
+        <!-- Token Balances -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">SMS Tokens</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span>Current Balance:</span>
+                        <span class="font-bold">{{ smsTokens }} tokens</span>
+                    </div>
+                    <div class="text-sm text-gray-600">Cost: ${{ (smsPurchaseAmount * 0.04).toFixed(2) }} CAD</div>
+                    <p class="text-sm font-bold text-gray-700">Minimum purchase: $1.00 CAD</p>
+                    <div class="flex space-x-4">
+                        <input v-model="smsPurchaseAmount" 
+                               type="number" 
+                               min="1" 
+                               class="border rounded px-3 py-2 w-24" 
+                               placeholder="Amount">
+                        <button @click="purchaseTokens('sms')" 
+                                class="bg-indigo-600 text-white px-4 py-2 rounded">
+                            Purchase (${{ (smsPurchaseAmount * 0.04).toFixed(2) }} CAD)
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-1 text-sm text-gray-500 mt-1">
+                        <svg class="text-green-500" style="width: 14px; height: 14px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-sm">Secure</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">AI Call Tokens</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span>Current Balance:</span>
+                        <span class="font-bold">{{ aiTokens }} tokens</span>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        Cost: ${{ (aiPurchaseAmount * 0.04).toFixed(2) }} CAD
+                    </div>
+                    <p class="text-sm font-bold text-gray-700">Minimum purchase: $1.00 CAD</p>
+                    <div class="flex space-x-4">
+                        <input v-model="aiPurchaseAmount" 
+                               type="number" 
+                               min="1" 
+                               class="border rounded px-3 py-2 w-24" 
+                               placeholder="Amount">
+                        <button @click="purchaseTokens('ai')" 
+                                class="bg-indigo-600 text-white px-4 py-2 rounded">
+                            Purchase (${{ (aiPurchaseAmount * 0.04).toFixed(2) }} CAD)
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-1 text-sm text-gray-500 mt-1">
+                        <svg class="text-green-500" style="width: 14px; height: 14px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-sm">Secure</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white shadow rounded-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Email Tokens</h2>
+                <div class="space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span>Current Balance:</span>
+                        <span class="font-bold">{{ emailTokens }} tokens</span>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        Cost: ${{ (emailPurchaseAmount * 0.02).toFixed(2) }} CAD
+                    </div>
+                    <p class="text-sm font-bold text-gray-700">Minimum purchase: $1.00 CAD</p>
+                    <div class="flex space-x-4">
+                        <input v-model="emailPurchaseAmount" 
+                               type="number" 
+                               min="1" 
+                               class="border rounded px-3 py-2 w-24" 
+                               placeholder="Amount">
+                        <button @click="purchaseTokens('email')" 
+                                class="bg-indigo-600 text-white px-4 py-2 rounded">
+                            Purchase (${{ (emailPurchaseAmount * 0.02).toFixed(2) }} CAD)
+                        </button>
+                    </div>
+                    <div class="flex items-center space-x-1 text-sm text-gray-500 mt-1">
+                        <svg class="text-green-500" style="width: 14px; height: 14px;" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <span class="text-sm">Secure</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Purchase History -->
+        <div class="bg-white shadow rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">Purchase History</h2>
+            <div v-if="!invoices || !invoices.length" class="text-sm text-gray-500">No purchases yet.</div>
+            <div v-else class="space-y-4">
+                <div v-for="invoice in sortedInvoices" :key="invoice.id" class="border rounded-lg">
+                    <div class="px-6 py-4 flex flex-wrap items-center justify-between bg-gray-50 rounded-t-lg">
+                        <div class="text-sm text-gray-700">
+                            <div class="font-medium">Invoice #{{ invoice.id }}</div>
+                            <div>Date: {{ new Date(invoice.createdAt).toLocaleString() }}</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-lg font-semibold">${{ (invoice.amount || 0).toFixed(2) }} {{ (invoice.currency || 'USD').toUpperCase() }}</div>
+                            <span :class="{
+                                'px-2 py-1 text-xs rounded-full': true,
+                                'bg-green-100 text-green-800': invoice.status === 'paid' || invoice.status === 'succeeded',
+                                'bg-yellow-100 text-yellow-800': invoice.status === 'pending' || invoice.status === 'requires_action',
+                                'bg-red-100 text-red-800': invoice.status === 'failed'
+                            }">{{ invoice.status }}</span>
+                        </div>
+                    </div>
+                    <div class="px-6 py-4 overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="text-xs text-gray-500 uppercase">
+                                    <th class="text-left py-2">Item</th>
+                                    <th class="text-left py-2">Qty</th>
+                                    <th class="text-left py-2">Unit</th>
+                                    <th class="text-left py-2">Total</th>
+                                    <th class="text-left py-2">Paid</th>
+                                </tr>
+                            </thead>
+                            <tbody class="text-sm text-gray-700">
+                                <tr v-for="(item, idx) in (invoice.items || [])" :key="idx" class="border-t">
+                                    <td class="py-2">{{ item.description }}</td>
+                                    <td class="py-2">{{ item.quantity }}</td>
+                                    <td class="py-2">${{ (item.unitPrice || 0).toFixed(2) }}</td>
+                                    <td class="py-2">${{ (item.total || 0).toFixed(2) }}</td>
+                                    <td class="py-2">
+                                        <span v-if="item.paidAt" class="text-green-600">{{ new Date(item.paidAt).toLocaleString() }}</span>
+                                        <span v-else class="text-gray-400">—</span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stripe Payment Modal -->
+    <div v-if="showPaymentModal" 
+         class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">Complete Purchase</h3>
+                <button @click="closePaymentModal" 
+                        class="text-gray-500 hover:text-gray-700">
+                    <span class="text-2xl">&times;</span>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <p class="text-gray-600 mb-2">
+                    Purchasing {{ currentPurchaseAmount }} {{ currentPurchaseType.toUpperCase() }} tokens
+                </p>
+                <p class="font-semibold">
+                    Total: ${{ (currentPurchaseAmount * (currentPurchaseType === 'sms' || currentPurchaseType === 'ai' ? 0.04 : 0.02)).toFixed(2) }} CAD
+                </p>
+            </div>
+
+            <!-- Payment Security Indicators -->
+            <div class="payment-security-section mb-4 p-3 bg-gray-50 rounded-lg">
+                <p class="text-sm font-medium text-gray-700 mb-2">Secure Payment</p>
+                <div class="flex flex-wrap items-center gap-3 text-xs text-gray-600">
+                    <div class="flex items-center space-x-1">
+                        <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clip-rule="evenodd"/>
+                        </svg>
+                        <span>SSL Secured</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>PCI Compliant</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <svg class="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Stripe Powered</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Information Display -->
+            <div v-if="paymentMethods && paymentMethods.availableMethods" class="mb-4">
+                <!-- Saved Payment Methods (optional selection) -->
+                <div v-if="paymentMethods.savedMethods && paymentMethods.savedMethods.length > 0" class="mb-4">
+                    <p class="text-sm font-medium text-gray-700 mb-2">Quick Payment Options</p>
+                    <div class="flex flex-wrap gap-2">
+                        <div v-for="method in paymentMethods.savedMethods" 
+                             :key="method.id"
+                             @click="selectSavedPaymentMethod(method)"
+                             class="border rounded-lg p-2 cursor-pointer hover:bg-gray-50 hover:border-indigo-300 transition-colors">
+                            <div class="flex items-center space-x-2">
+                                <div class="w-6 h-4 bg-gray-200 rounded flex items-center justify-center text-xs font-bold">
+                                    {{ method.brand }}
+                                </div>
+                                <span class="text-sm">•••• {{ method.name.slice(-4) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border-t my-4"></div>
+                </div>
+
+                <!-- Processing Information with Icons -->
+                <div v-if="paymentMethods.processingInfo" class="mb-4 p-3 bg-blue-50 rounded-lg">
+                    <p class="text-sm font-medium text-blue-800 mb-3">Accepted Payment Methods</p>
+                    
+                    <!-- Accepted Cards with Icons -->
+                    <div class="mb-3">
+                        <div class="flex flex-wrap items-center gap-2">
+                            <!-- Visa -->
+                            <div class="bg-white rounded px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                <svg class="w-6 h-4" viewBox="0 0 40 24" fill="none">
+                                    <rect width="40" height="24" rx="4" fill="white"/>
+                                    <path d="M16.283 7.5h2.526l-1.626 9h-2.526l1.626-9zm7.744 5.775c.01-.72-.96-1.125-1.51-1.365-.55-.24-.9-.405-.9-.65 0-.22.27-.45.85-.45.485-.005.84.095 1.12.2l.2-.94c-.27-.1-.695-.195-1.225-.195-1.295 0-2.205.65-2.215 1.58-.01.69.65 1.07 1.145 1.3.51.235.68.385.68.595 0 .32-.405.46-.78.46-.655.005-1.035-.17-1.34-.305l-.235.925c.305.135.87.25 1.455.255 1.375 0 2.275-.64 2.28-1.635l-.005-.025zm3.745-5.775h-1.955c-.605 0-1.055.165-1.32.765l-3.745 8.235h2.89l.575-1.5h3.53l.33 1.5h2.55l-2.855-9zm-2.405 6.075l1.445-3.78.83 3.78h-2.275zm-7.96-6.075l-2.27 6.135-.245-1.17c-.42-1.35-1.725-2.81-3.185-3.54l2.26-1.425h3.44z" fill="#1434CB"/>
+                                    <path d="M8.813 7.5H5.878l-.035.21c3.445.83 5.725 2.835 6.67 5.24L11.388 8.265c-.18-.695-.7-.765-1.35-.765H8.813z" fill="#F7B600"/>
+                                </svg>
+                                <span class="text-xs font-medium text-gray-700">Visa</span>
+                            </div>
+                            
+                            <!-- Mastercard -->
+                            <div class="bg-white rounded px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                <svg class="w-6 h-4" viewBox="0 0 40 24" fill="none">
+                                    <rect width="40" height="24" rx="4" fill="white"/>
+                                    <circle cx="15" cy="12" r="7" fill="#FF5F00"/>
+                                    <circle cx="25" cy="12" r="7" fill="#EB001B"/>
+                                    <circle cx="20" cy="12" r="7" fill="#F79E1B"/>
+                                </svg>
+                                <span class="text-xs font-medium text-gray-700">MC</span>
+                            </div>
+                            
+                            <!-- American Express -->
+                            <div class="bg-white rounded px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                <svg class="w-6 h-4" viewBox="0 0 40 24" fill="none">
+                                    <rect width="40" height="24" rx="4" fill="#006FCF"/>
+                                    <path d="M8.5 8h3l.5 1.5L12.5 8h3v8h-2v-5l-1 3h-1l-1-3v5h-2V8zm8 0h6v1.5h-4V10h3.5v1.5H18.5v1h4V14h-6V8zm9 0h2l1.5 4 1.5-4h2l-2.5 8h-2l-2.5-8z" fill="white"/>
+                                </svg>
+                                <span class="text-xs font-medium text-gray-700">Amex</span>
+                            </div>
+                            
+                            <!-- Discover -->
+                            <div class="bg-white rounded px-2 py-1 flex items-center space-x-1 shadow-sm">
+                                <svg class="w-6 h-4" viewBox="0 0 40 24" fill="none">
+                                    <rect width="40" height="24" rx="4" fill="#FF6000"/>
+                                    <path d="M7 9h6v1H8v1h4v1H8v1h5v1H7V9zm7 0h2v5h1.5l.5-1.5h2l.2 1.5H22V9h2v6h-3l-.5-1.5-.5 1.5h-3.5l-1.5-6zm4.2 3l.3-1.5.3 1.5h-.6z" fill="white"/>
+                                </svg>
+                                <span class="text-xs font-medium text-gray-700">Disc</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Currency and Countries with Icons -->
+                    <div class="flex flex-wrap items-center gap-4">
+                        <!-- Currency -->
+                        <div class="flex items-center space-x-2">
+                            <div class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clip-rule="evenodd"/>
+                                </svg>
+                            </div>
+                            <span class="text-xs text-blue-700 font-medium">CAD</span>
+                        </div>
+                        
+                        <!-- Countries -->
+                        <div class="flex items-center space-x-2">
+                            <!-- Canada Flag -->
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-5 h-3" viewBox="0 0 36 24" fill="none">
+                                    <rect width="36" height="24" fill="#FF0000"/>
+                                    <rect x="12" width="12" height="24" fill="white"/>
+                                    <path d="M18 8l1.5 3h1.5l-1.5 1.5L20 15l-2-1.5L16 15l.5-2.5L15 11h1.5L18 8z" fill="#FF0000"/>
+                                </svg>
+                                <span class="text-xs text-blue-700">CA</span>
+                            </div>
+                            
+                            <!-- US Flag -->
+                            <div class="flex items-center space-x-1">
+                                <svg class="w-5 h-3" viewBox="0 0 36 24" fill="none">
+                                    <rect width="36" height="24" fill="#B22234"/>
+                                    <rect y="2" width="36" height="2" fill="white"/>
+                                    <rect y="6" width="36" height="2" fill="white"/>
+                                    <rect y="10" width="36" height="2" fill="white"/>
+                                    <rect y="14" width="36" height="2" fill="white"/>
+                                    <rect y="18" width="36" height="2" fill="white"/>
+                                    <rect y="22" width="36" height="2" fill="white"/>
+                                    <rect width="14" height="14" fill="#3C3B6E"/>
+                                </svg>
+                                <span class="text-xs text-blue-700">US</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Card Payment Input (Always Visible) -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Card Information
+                </label>
+                <div id="card-element" class="border rounded-md p-3"></div>
+            </div>
+
+            <div id="card-errors" class="text-red-600 text-sm mt-2">{{ stripeError }}</div>
+
+            <div class="flex justify-end space-x-4">
+                <button @click="closePaymentModal" 
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800">
+                    Cancel
+                </button>
+                <button @click="processPayment" 
+                        :disabled="processing"
+                        class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 disabled:opacity-50">
+                    {{ processing ? 'Processing...' : 'Pay Now' }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const { createApp } = Vue
+
+createApp({
+    data() {
+        return {
+            smsTokens: 0,
+            emailTokens: 0,
+            aiTokens: 0,
+            smsPurchaseAmount: 1,
+            emailPurchaseAmount: 1,
+            aiPurchaseAmount: 1,
+            invoices: [],
+            stripe: null,
+            cardElement: null,
+            processing: false,
+            showPaymentModal: false,
+            currentPurchaseType: null,
+            currentPurchaseAmount: 0,
+            user: null,
+            stripeError: '',
+            stripeLoaded: false,
+            stripeLoading: false,
+            paymentMethods: null,
+            showPaymentOptions: true,
+            selectedPaymentMethod: null
+        }
+    },
+    methods: {
+        async loadStripe() {
+            if (this.stripeLoaded) return;
+            
+            try {
+                this.stripeLoading = true;
+                this.stripe = Stripe('<%= STRIPE_PUBLIC_KEY %>');
+                this.stripeLoaded = true;
+                this.stripeError = '';
+            } catch (error) {
+                console.error('Failed to load Stripe:', error);
+                this.stripeError = 'Failed to load payment system';
+            } finally {
+                this.stripeLoading = false;
+            }
+        },
+
+        async purchaseTokens(type) {
+            try {
+                if (!this.stripeLoaded) {
+                    await this.loadStripe();
+                }
+
+                if (!this.stripeLoaded) {
+                    throw new Error('Payment system is not available. Please try again later.');
+                }
+
+                const amount = type === 'sms' ? this.smsPurchaseAmount : 
+                              type === 'ai' ? this.aiPurchaseAmount : 
+                              this.emailPurchaseAmount;
+                this.currentPurchaseType = type;
+                this.currentPurchaseAmount = amount;
+                this.showPaymentModal = true;
+                this.stripeError = '';
+
+                // Create card element automatically when modal opens
+                this.$nextTick(() => {
+                    setTimeout(() => {
+                        this.createCardElement();
+                    }, 100);
+                });
+            } catch (error) {
+                this.stripeError = error.message;
+                console.error('Purchase tokens error:', error);
+            }
+        },
+        
+        closePaymentModal() {
+            if (this.cardElement) {
+                this.cardElement.unmount();
+            }
+            this.showPaymentModal = false;
+            this.showPaymentOptions = true;
+            this.selectedPaymentMethod = null;
+            this.stripeError = '';
+        },
+        
+        async processPayment() {
+            try {
+                this.processing = true;
+                let paymentMethodId;
+
+                // Check if user selected a saved payment method
+                if (this.selectedPaymentMethod && this.selectedPaymentMethod.type === 'saved_card') {
+                    // Use existing saved payment method
+                    paymentMethodId = this.selectedPaymentMethod.id;
+                } else {
+                    // Create new payment method from card element
+                    if (!this.stripe || !this.cardElement) {
+                        throw new Error('Payment system is not ready. Please try again.');
+                    }
+
+                    const { paymentMethod, error } = await this.stripe.createPaymentMethod({
+                        type: 'card',
+                        card: this.cardElement,
+                    });
+
+                    if (error) {
+                        throw new Error(error.message);
+                    }
+
+                    paymentMethodId = paymentMethod.id;
+                }
+
+                const response = await fetch('/api/tokens/purchase', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify({
+                        paymentMethodId: paymentMethodId,
+                        tokenType: this.currentPurchaseType,
+                        tokenCount: parseInt(this.currentPurchaseAmount)
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(result.error || 'Payment failed');
+                }
+                
+                if (result.success) {
+                    this.closePaymentModal();
+                    await this.loadUserData();
+                    alert('Tokens purchased successfully!');
+                    
+                    // Reset purchase amounts
+                    if (this.currentPurchaseType === 'sms') {
+                        this.smsPurchaseAmount = 1;
+                    } else if (this.currentPurchaseType === 'ai') {
+                        this.aiPurchaseAmount = 1;
+                    } else {
+                        this.emailPurchaseAmount = 1;
+                    }
+                } else {
+                    throw new Error(result.error || 'Payment failed');
+                }
+            } catch (error) {
+                console.error('Payment error:', error);
+                this.stripeError = error.message || 'An error occurred during payment';
+            } finally {
+                this.processing = false;
+            }
+        },
+        
+        async loadUserData() {
+            try {
+                const response = await fetch('/api/user', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const userData = await response.json();
+                    this.user = userData;
+                    this.smsTokens = userData.smsTokens || 0;
+                    this.emailTokens = userData.emailTokens || 0;
+                    this.aiTokens = userData.aiTokens || 0;
+                    this.invoices = userData.invoices || [];
+                }
+            } catch (error) {
+                console.error('Failed to load user data:', error);
+            }
+        },
+
+        async loadPaymentMethods() {
+            try {
+                const response = await fetch('/api/payments/methods', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    this.paymentMethods = await response.json();
+                } else {
+                    console.error('Failed to load payment methods, status:', response.status);
+                    // Fallback to basic payment methods
+                    this.paymentMethods = {
+                        availableMethods: {
+                            card: {
+                                name: 'Credit/Debit Card',
+                                types: ['Visa', 'Mastercard', 'American Express', 'Discover'],
+                                description: 'All major credit and debit cards accepted',
+                                icon: 'credit-card',
+                                enabled: true
+                            }
+                        },
+                        savedMethods: [],
+                        currency: 'CAD'
+                    };
+                }
+            } catch (error) {
+                console.error('Failed to load payment methods:', error);
+                // Fallback to basic payment methods
+                this.paymentMethods = {
+                    availableMethods: {
+                        card: {
+                            name: 'Credit/Debit Card',
+                            types: ['Visa', 'Mastercard', 'American Express', 'Discover'],
+                            description: 'All major credit and debit cards accepted',
+                            icon: 'credit-card',
+                            enabled: true
+                        }
+                    },
+                    savedMethods: [],
+                    currency: 'CAD'
+                };
+            }
+        },
+
+        createCardElement() {
+            const cardElementContainer = document.getElementById('card-element');
+            if (!cardElementContainer) {
+                console.error('Card element container not found');
+                return;
+            }
+
+            if (this.cardElement) {
+                this.cardElement.unmount();
+            }
+            
+            const elements = this.stripe.elements();
+            this.cardElement = elements.create('card', {
+                style: {
+                    base: {
+                        fontSize: '16px',
+                        color: '#32325d',
+                        '::placeholder': {
+                            color: '#aab7c4'
+                        }
+                    },
+                    invalid: {
+                        color: '#fa755a',
+                        iconColor: '#fa755a'
+                    }
+                }
+            });
+
+            this.cardElement.on('change', (event) => {
+                this.stripeError = event.error ? event.error.message : '';
+            });
+            
+            this.cardElement.mount('#card-element');
+        },
+
+        selectSavedPaymentMethod(method) {
+            this.selectedPaymentMethod = method;
+            // User can still choose to use card input instead
+        }
+    },
+    computed: {
+        sortedInvoices() {
+            return (this.invoices || []).slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        }
+    },
+    async created() {
+        const token = localStorage.getItem('token');
+        if (!token) {
+            if (window.redirectToLogin) window.redirectToLogin('no_token', { from: 'my-tokens' });
+            else window.location.replace('/login?loop=1&reason=no_token&from=my-tokens');
+            return;
+        }
+        
+        await Promise.all([
+            this.loadUserData(),
+            this.loadStripe(),
+            this.loadPaymentMethods()
+        ]);
+    },
+    beforeUnmount() {
+        if (this.cardElement) {
+            this.cardElement.unmount();
+        }
+    }
+}).mount('#app')
+</script> 

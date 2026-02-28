@@ -1,0 +1,241 @@
+<%- include('partials/nav') %>
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" id="app">
+    <div class="py-6">
+        <h1 class="text-2xl font-semibold text-gray-900 mb-2">Invoices & Receipts</h1>
+        <p class="text-sm text-gray-600 mb-6">Billing is managed by Campaign Builder. Invoices and receipts are issued to your account. Payment is handled off-platform (e-transfer, cheque, or as arranged).</p>
+
+        <!-- Receipt List -->
+        <div class="bg-white shadow overflow-hidden sm:rounded-md p-6">
+            <!-- Loading State -->
+            <div v-if="loading" class="text-center py-8">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                <p class="mt-2 text-gray-600">Loading invoices...</p>
+            </div>
+            
+            <!-- Empty State -->
+            <div v-else-if="receipts.length === 0" class="text-center py-8">
+                <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h3 class="mt-2 text-sm font-medium text-gray-900">No invoices</h3>
+                <p class="mt-1 text-sm text-gray-500">You don't have any invoices yet.</p>
+            </div>
+            
+            <!-- Receipt List -->
+            <ul v-else class="divide-y divide-gray-200">
+                <li v-for="receipt in receipts" :key="receipt.id" class="border-b border-gray-200 py-6 first:pt-0 last:border-0 last:pb-0">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-medium">
+                                <span v-if="receipt.type === 'phone_number_setup'">
+                                    Phone Number Setup Fee
+                                </span>
+                                <span v-else>
+                                    {{ receipt.metadata?.tokenType ? `${receipt.metadata.tokenType.toUpperCase()} Tokens` : (receipt.items && receipt.items[0]) ? receipt.items[0].description : 'Invoice' }}
+                                </span>
+                            </h3>
+                            
+                            <!-- Professional Details -->
+                            <div class="text-sm text-gray-600 mt-2" v-if="receipt.companyName || receipt.purchaserName">
+                                <div v-if="receipt.companyName" class="font-medium text-gray-900">
+                                    {{ receipt.companyName }}
+                                </div>
+                                <div v-if="receipt.purchaserName" class="text-gray-600">
+                                    {{ receipt.purchaserName }}
+                                </div>
+                            </div>
+                            
+                            <div class="text-sm text-gray-500 mt-1">
+                                <div>Date: {{ new Date(receipt.createdAt).toLocaleDateString() }}</div>
+                                <div v-if="receipt.items && receipt.items.length">
+                                    <span v-if="receipt.metadata?.tokenAmount">
+                                        Quantity: {{ receipt.metadata.tokenAmount }} tokens
+                                    </span>
+                                    <span v-else>
+                                        {{ receipt.items[0].description }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-medium">${{ receipt.amount.toFixed(2) }} CAD</div>
+                            <div :class="{
+                                'px-2 py-1 text-xs rounded-full inline-block mt-1': true,
+                                'bg-gray-100 text-gray-800': receipt.status === 'draft',
+                                'bg-amber-100 text-amber-800': receipt.status === 'issued' || receipt.status === 'pending' || receipt.status === 'requires_payment_method',
+                                'bg-green-100 text-green-800': receipt.status === 'succeeded' || receipt.status === 'paid',
+                                'bg-red-100 text-red-800': receipt.status === 'failed'
+                            }">
+                                {{ formatInvoiceStatus(receipt.status) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Line Items -->
+                    <div class="mt-4">
+                        <h3 class="text-sm font-medium text-gray-700 mb-2">Items</h3>
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead>
+                                <tr>
+                                    <th class="text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                                    <th class="text-right text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                                    <th class="text-right text-xs font-medium text-gray-500 uppercase">Price</th>
+                                    <th class="text-right text-xs font-medium text-gray-500 uppercase">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr v-for="item in receipt.items" :key="item.description">
+                                    <td class="py-2 text-sm text-gray-900">{{ item.description }}</td>
+                                    <td class="py-2 text-sm text-gray-900 text-right">{{ item.quantity }}</td>
+                                    <td class="py-2 text-sm text-gray-900 text-right">${{ item.unitPrice.toFixed(2) }}</td>
+                                    <td class="py-2 text-sm text-gray-900 text-right">${{ item.total.toFixed(2) }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Actions (read-only: download only) -->
+                    <div class="mt-4 flex justify-end">
+                        <button @click="downloadReceipt(receipt)" 
+                                class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                            Download PDF
+                        </button>
+                    </div>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/jspdf-autotable@3.5.31/dist/jspdf.plugin.autotable.min.js"></script>
+
+<script>
+const { createApp } = Vue
+const stripe = Stripe('<%= STRIPE_PUBLIC_KEY %>');
+
+createApp({
+    data() {
+        return {
+            receipts: [],
+            loading: true,
+            showPaymentModal: false,
+            processing: false,
+            currentReceipt: null,
+            paymentElement: null,
+            elements: null,
+            paymentError: null,
+            user: null,
+            stripe: null,
+            cardElement: null,
+            stripeError: '',
+            stripeLoaded: false,
+            stripeLoading: false
+        }
+    },
+    methods: {
+        async loadReceipts() {
+            try {
+                this.loading = true;
+                const response = await fetch('/api/invoices', {
+                    credentials: 'include' // Include cookies for authentication
+                });
+                
+                if (response.ok) {
+                    this.receipts = await response.json();
+
+                } else {
+                    console.error('Failed to load receipts:', response.status, response.statusText);
+                }
+            } catch (error) {
+                console.error('Failed to load receipts:', error);
+            } finally {
+                this.loading = false;
+            }
+        },
+        
+        downloadReceipt(receipt) {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            // Company Info
+            doc.setFontSize(20);
+            doc.text('Campaign Builder', 20, 20);
+            
+            doc.setFontSize(10);
+            doc.text('Swift Media Group Ltd', 20, 30);
+            doc.text('200 Carnegie Drive', 20, 35);
+            doc.text('St. Albert, AB T8N5A7', 20, 40);
+            
+            // Receipt Details
+            doc.setFontSize(12);
+            doc.text(`Receipt #: ${receipt.id}`, 140, 30);
+            doc.text(`Date: ${new Date(receipt.createdAt).toLocaleDateString()}`, 140, 35);
+            doc.text(`Status: ${receipt.status === 'requires_payment_method' ? 'pending' : receipt.status}`, 140, 40);
+            
+            // Bill To
+            doc.setFontSize(12);
+            doc.text('Bill To:', 20, 60);
+            doc.setFontSize(10);
+            
+            // Professional details in PDF
+            if (receipt.companyName && receipt.companyName !== 'Individual') {
+                doc.text(receipt.companyName, 20, 65);
+                if (receipt.purchaserName) {
+                    doc.text(receipt.purchaserName, 20, 70);
+                }
+            } else if (receipt.purchaserName) {
+                doc.text(receipt.purchaserName, 20, 65);
+            } else {
+                doc.text(this.user?.email || 'Customer', 20, 65);
+            }
+            
+            // Items Table
+            const tableColumn = ['Description', 'Quantity', 'Price', 'Total'];
+            const tableRows = receipt.items.map(item => [
+                item.description,
+                item.quantity,
+                `$${item.unitPrice.toFixed(2)}`,
+                `$${item.total.toFixed(2)}`
+            ]);
+            
+            doc.autoTable({
+                startY: 80,
+                head: [tableColumn],
+                body: tableRows,
+                theme: 'grid',
+                headStyles: { fillColor: [79, 70, 229] } // Indigo color
+            });
+            
+            // Total
+            const finalY = doc.lastAutoTable.finalY || 120;
+            doc.text(`Total Amount: $${receipt.amount.toFixed(2)}`, 140, finalY + 20);
+            
+            // Save PDF
+            doc.save(`receipt-${receipt.id}.pdf`);
+        },
+
+        async loadUser() {
+            try {
+                const response = await fetch('/api/user', {
+                    credentials: 'include' // Include cookies for authentication
+                });
+                if (response.ok) {
+                    this.user = await response.json();
+                }
+            } catch (error) {
+                console.error('Failed to load user:', error);
+            }
+        },
+
+    },
+    async created() {
+        await Promise.all([
+            this.loadReceipts(),
+            this.loadUser()
+        ]);
+    }
+}).mount('#app')
+</script> 
