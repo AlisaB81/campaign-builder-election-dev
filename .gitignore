@@ -10,7 +10,7 @@ node_modules/
 *.p12
 *.pfx
 
-# Sensitive / voter & membership data (DO NOT COMMIT)
+# Sensitive EDA / voter / membership data (NEVER COMMIT)
 .eda-master/
 **/.eda-master/
 data/
@@ -21,10 +21,8 @@ exports/
 **/exports/
 backups/
 **/backups/
-tmp/
-**/tmp/
 
-# Common data file types
+# Common export/data formats (safety net)
 *.csv
 *.tsv
 *.xls
@@ -34,9 +32,8 @@ tmp/
 *.pdf
 *.xml
 *.zip
-*.json
 
-# Logs / runtime
+# Runtime/logs
 logs/
 .pm2/
 .pids/
